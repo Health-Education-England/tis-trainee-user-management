@@ -253,7 +253,7 @@ jobs:
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: .aws/task-definition.json
+          task-definition: .aws/task-definition-preprod.json
           container-name: ${{ github.event.repository.name }}
           image: ${{ steps.login-ecr.outputs.registry }}/${{ github.event.repository.name }}:${{ github.sha }}
 
@@ -295,7 +295,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Create pre-prod task definition
+      - name: Create prod task definition
         run: sed 's/${environment}/prod/g' .aws/task-definition-template.json > .aws/task-definition-prod.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
