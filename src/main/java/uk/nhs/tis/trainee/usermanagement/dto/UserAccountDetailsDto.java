@@ -19,18 +19,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.dto;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import lombok.Value;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class TisTraineeUserManagementApplicationTest {
+@Value
+public class UserAccountDetailsDto {
 
-  @Test
-  void contextLoads() {
-
-  }
+  String userStatus;
 }

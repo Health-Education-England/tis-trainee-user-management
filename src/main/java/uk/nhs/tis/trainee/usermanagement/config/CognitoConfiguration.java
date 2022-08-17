@@ -19,18 +19,28 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.config;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProviderClientBuilder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class TisTraineeUserManagementApplicationTest {
+/**
+ * Configuration required for Cognito.
+ */
+@Configuration
+public class CognitoConfiguration {
 
-  @Test
-  void contextLoads() {
-
+  /**
+   * Get a default Cognito IDP client.
+   *
+   * @return The built client.
+   */
+  @Bean
+  public AWSCognitoIdentityProvider getAwsCognitoIdentityProvider(
+      @Value("${cloud.aws.region.static}") String region) {
+    return AWSCognitoIdentityProviderClientBuilder.standard().withRegion(region).build();
   }
 }

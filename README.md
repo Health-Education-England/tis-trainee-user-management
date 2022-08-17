@@ -21,13 +21,18 @@ gradlew bootRun
 
 | Name                 | Description                                   | Default |
 |----------------------|-----------------------------------------------|---------|
+| AWS_REGION           | The AWS region to use.                        |         |
 | COGNITO_USER_POOL_ID | The ID of the Cognito user pool to manage.    |         |
 | SENTRY_DSN           | A Sentry error monitoring Data Source Name.   |         |
 | SENTRY_ENVIRONMENT   | The environment to log Sentry events against. | local   |
 
 #### Usage Examples
 
-TODO once functionality is implemented
+##### Get User Account Details
+
+```
+GET /user-management/api/user-account/details/{username}
+```
 
 ### Testing
 
