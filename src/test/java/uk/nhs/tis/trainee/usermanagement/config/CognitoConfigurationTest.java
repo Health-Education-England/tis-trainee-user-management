@@ -19,18 +19,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.config;
 
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+
+import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class TisTraineeUserManagementApplicationTest {
+class CognitoConfigurationTest {
+
+  private CognitoConfiguration configuration;
+
+  @BeforeEach
+  void setUp() {
+    configuration = new CognitoConfiguration();
+  }
 
   @Test
-  void contextLoads() {
-
+  void getAwsCognitoIdentityProvider() {
+    AWSCognitoIdentityProvider cognitoIdp = configuration.getAwsCognitoIdentityProvider("");
+    assertThat("Unexpected provider.", cognitoIdp, notNullValue());
   }
 }

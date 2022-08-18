@@ -1,0 +1,9 @@
+application:
+  aws:
+    cognito:
+      user-pool-id: eu-west-2_dummy
+
+cloud:
+  aws:
+    region:
+      static: eu-west-2
