@@ -52,6 +52,9 @@ dependencies {
   implementation "io.sentry:sentry-logback:$sentryVersion"
 
   implementation "com.amazonaws:aws-java-sdk-cognitoidp"
+
+  // Amazon SQS
+  implementation "io.awspring.cloud:spring-cloud-starter-aws-messaging"
 }
 
 checkstyle {
