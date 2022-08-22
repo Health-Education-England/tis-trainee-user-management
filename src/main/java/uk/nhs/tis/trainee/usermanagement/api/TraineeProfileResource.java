@@ -50,11 +50,11 @@ public class TraineeProfileResource {
    * @return Ture if single profile sync event is published.
    */
   @PostMapping("/sync/{traineeTisId}")
-  ResponseEntity<Boolean> syncTraineeProfile(@PathVariable String traineeTisId) {
+  ResponseEntity<Void> syncTraineeProfile(@PathVariable String traineeTisId) {
     log.info("Single profile re-sync requested for trainee '{}'", traineeTisId);
 
     eventPublishService.publishSingleProfileSyncEvent(traineeTisId);
 
-    return ResponseEntity.ok(true);
+    return ResponseEntity.ok().build();
   }
 }

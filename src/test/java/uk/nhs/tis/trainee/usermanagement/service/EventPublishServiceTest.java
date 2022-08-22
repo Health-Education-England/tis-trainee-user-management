@@ -31,6 +31,7 @@ import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 
 class EventPublishServiceTest {
 
@@ -50,10 +51,11 @@ class EventPublishServiceTest {
 
     eventPublishService.publishSingleProfileSyncEvent(TRAINEE_ID);
 
-    ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(
-        String.class);
+    ArgumentCaptor<DataRequestEvent> eventCaptor = ArgumentCaptor.forClass(
+        DataRequestEvent.class);
     verify(messagingTemplate).convertAndSend(eq(QUEUE_URL), eventCaptor.capture());
 
-    assertThat("Unexpected trainee ID.", eventCaptor.getValue(), is(TRAINEE_ID));
+    assertThat("Unexpected table.", eventCaptor.getValue().getTable(), is("Person"));
+    assertThat("Unexpected trainee ID.", eventCaptor.getValue().getId(), is(TRAINEE_ID));
   }
 }

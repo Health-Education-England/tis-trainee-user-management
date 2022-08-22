@@ -12,7 +12,7 @@ application:
     cognito:
       user-pool-id: ${COGNITO_USER_POOL_ID}
     sqs:
-      profile-created: ${PROFILE_CREATED_QUEUE_URL:}
+      request: ${REQUEST_QUEUE_URL:}
 
 cloud:
   aws:

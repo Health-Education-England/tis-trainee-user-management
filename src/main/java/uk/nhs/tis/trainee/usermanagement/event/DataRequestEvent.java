@@ -19,39 +19,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.service;
+package uk.nhs.tis.trainee.usermanagement.event;
 
-import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
+import lombok.Data;
 
 /**
- * A service to publish events to SQS.
+ * An event to request sync of record.
  */
-@Slf4j
-@Service
-public class EventPublishService {
+@Data
+public class DataRequestEvent {
 
-  private final QueueMessagingTemplate messagingTemplate;
-  private final String queueUrl;
-
-  EventPublishService(QueueMessagingTemplate messagingTemplate,
-      @Value("${application.aws.sqs.request}") String queueUrl) {
-    this.messagingTemplate = messagingTemplate;
-    this.queueUrl = queueUrl;
-  }
-
-  /**
-   * Publish a single profile sync event.
-   *
-   * @param traineeTisId The TisId of the trainee to sync.
-   */
-  public void publishSingleProfileSyncEvent(String traineeTisId) {
-    log.info("Sending single profile sync event for trainee id '{}'", traineeTisId);
-
-    DataRequestEvent dataRequestEvent = new DataRequestEvent("Person", traineeTisId);
-    messagingTemplate.convertAndSend(queueUrl, dataRequestEvent);
-  }
+  private final String table;
+  private final String id;
 }
