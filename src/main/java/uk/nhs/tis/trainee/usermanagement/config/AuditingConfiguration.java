@@ -19,22 +19,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.config;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.PropertySource;
+import org.springframework.boot.actuate.audit.AuditEventRepository;
+import org.springframework.boot.actuate.audit.InMemoryAuditEventRepository;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-@SpringBootApplication
-@PropertySource(
-    {
-        "classpath:/application.yml",
-        "classpath:/config/profileclientapplication.properties"
-    }
-)
-public class TisTraineeUserManagementApplication {
+/**
+ * Required by TIS Security
+ */
+@Configuration
+public class AuditingConfiguration {
 
-  public static void main(String[] args) {
-    SpringApplication.run(TisTraineeUserManagementApplication.class);
+  @Bean
+  public AuditEventRepository auditEventRepository() {
+    return new InMemoryAuditEventRepository();
   }
 }
