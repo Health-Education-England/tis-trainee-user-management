@@ -32,6 +32,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -80,7 +81,10 @@ public class SecurityConfig {
     http
         // we don't need CSRF because our token is invulnerable
         .csrf().disable()
-        .authorizeRequests().anyRequest().authenticated()
+        .authorizeRequests()
+        .antMatchers(HttpMethod.GET, "/api/**").hasAuthority("trainee-support:view")
+        .antMatchers(HttpMethod.POST, "/api/**").hasAuthority("trainee-support:modify")
+        .anyRequest().authenticated()
         .and()
         .exceptionHandling().authenticationEntryPoint(unauthorizedHandler)
         .accessDeniedHandler(accessDeniedHandler)

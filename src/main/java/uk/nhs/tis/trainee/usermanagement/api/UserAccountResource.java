@@ -61,7 +61,6 @@ public class UserAccountResource {
    * @return The user account details.
    */
   @GetMapping("/details/{username}")
-  @PreAuthorize("hasAuthority('trainee-support:view')")
   ResponseEntity<UserAccountDetailsDto> getUserAccountDetails(@PathVariable String username) {
     log.info("Account details requested for user '{}'", username);
     AdminGetUserRequest request = new AdminGetUserRequest();
