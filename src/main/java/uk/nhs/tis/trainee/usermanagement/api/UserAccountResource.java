@@ -22,14 +22,19 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import com.amazonaws.services.cognitoidp.model.AWSCognitoIdentityProviderException;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
+import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
+import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
@@ -62,7 +67,7 @@ public class UserAccountResource {
    */
   @GetMapping("/details/{username}")
   ResponseEntity<UserAccountDetailsDto> getUserAccountDetails(@PathVariable String username) {
-    log.info("Account details requested for user '{}'", username);
+    log.info("Account details requested for user '{}'.", username);
     AdminGetUserRequest request = new AdminGetUserRequest();
     request.setUserPoolId(userPoolId);
     request.setUsername(username);
@@ -84,5 +89,25 @@ public class UserAccountResource {
 
     UserAccountDetailsDto response = new UserAccountDetailsDto(mfaStatus, userStatus);
     return ResponseEntity.ok(response);
+  }
+
+  /**
+   * Reset the MFA for the given user.
+   *
+   * @param username The username of the user.
+   * @return 204 No Content, if successful.
+   */
+  @PostMapping("/reset-mfa/{username}")
+  ResponseEntity<Void> resetUserAccountMfa(@PathVariable String username) {
+    log.info("MFA reset requested for user '{}'.", username);
+    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+    request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
+    request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
+
+    cognitoIdp.adminSetUserMFAPreference(request);
+    log.info("MFA reset for user '{}'.", username);
+    return ResponseEntity.noContent().build();
   }
 }

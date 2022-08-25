@@ -21,19 +21,25 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
+import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -125,5 +131,38 @@ class UserAccountResourceTest {
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.mfaStatus").value("PREFERRED_MFA"));
+  }
+
+  @Test
+  void shouldResetSmsMfa() throws Exception {
+    ArgumentCaptor<AdminSetUserMFAPreferenceRequest> requestCaptor = ArgumentCaptor.forClass(
+        AdminSetUserMFAPreferenceRequest.class);
+
+    when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
+        new AdminSetUserMFAPreferenceResult());
+
+    mockMvc.perform(post("/api/user-account/reset-mfa/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isNoContent());
+
+    AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
+    assertThat("Unexpected SMS enabled flag.", request.getSMSMfaSettings().getEnabled(), is(false));
+  }
+
+  @Test
+  void shouldResetTotpMfa() throws Exception {
+    ArgumentCaptor<AdminSetUserMFAPreferenceRequest> requestCaptor = ArgumentCaptor.forClass(
+        AdminSetUserMFAPreferenceRequest.class);
+
+    when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
+        new AdminSetUserMFAPreferenceResult());
+
+    mockMvc.perform(post("/api/user-account/reset-mfa/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isNoContent());
+
+    AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
+    assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
+        is(false));
   }
 }
