@@ -53,13 +53,14 @@ class UserAccountResourceTest {
   }
 
   @Test
-  void shouldReturnNoAccountWhenUserStatusConfirmed() throws Exception {
+  void shouldReturnNoAccountWhenUserNotFound() throws Exception {
     when(cognitoIdp.adminGetUser(any())).thenThrow(UserNotFoundException.class);
 
     mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.userStatus").value("NO ACCOUNT"));
+        .andExpect(jsonPath("$.mfaStatus").value("NO_ACCOUNT"))
+        .andExpect(jsonPath("$.userStatus").value("NO_ACCOUNT"));
   }
 
   @Test
@@ -99,5 +100,30 @@ class UserAccountResourceTest {
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.userStatus").value(UserStatusType.FORCE_CHANGE_PASSWORD.toString()));
+  }
+
+  @Test
+  void shouldReturnNoMfaWhenNoPreferredMfa() throws Exception {
+    AdminGetUserResult result = new AdminGetUserResult();
+
+    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
+
+    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mfaStatus").value("NO_MFA"));
+  }
+
+  @Test
+  void shouldReturnPreferredMfaWhenPreferredMfa() throws Exception {
+    AdminGetUserResult result = new AdminGetUserResult();
+    result.setPreferredMfaSetting("PREFERRED_MFA");
+
+    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
+
+    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mfaStatus").value("PREFERRED_MFA"));
   }
 }

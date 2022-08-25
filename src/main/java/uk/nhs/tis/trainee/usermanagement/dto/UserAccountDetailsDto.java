@@ -26,5 +26,6 @@ import lombok.Value;
 @Value
 public class UserAccountDetailsDto {
 
+  String mfaStatus;
   String userStatus;
 }
