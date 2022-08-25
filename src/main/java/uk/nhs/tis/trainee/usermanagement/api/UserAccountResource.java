@@ -28,7 +28,6 @@ import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,7 +42,8 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 @RequestMapping("/api/user-account")
 public class UserAccountResource {
 
-  private static final String NOT_FOUND_USER_STATUS = "NO ACCOUNT";
+  private static final String NO_ACCOUNT = "NO_ACCOUNT";
+  private static final String NO_MFA = "NO_MFA";
 
   @Value("${application.aws.cognito.user-pool-id}")
   private String userPoolId;
@@ -67,17 +67,22 @@ public class UserAccountResource {
     request.setUserPoolId(userPoolId);
     request.setUsername(username);
 
+    String mfaStatus;
     String userStatus;
 
     try {
       AdminGetUserResult result = cognitoIdp.adminGetUser(request);
+      String preferredMfa = result.getPreferredMfaSetting();
+
+      mfaStatus = preferredMfa == null ? NO_MFA : preferredMfa;
       userStatus = result.getUserStatus();
     } catch (UserNotFoundException e) {
       log.info("User '{}' not found.", username);
-      userStatus = NOT_FOUND_USER_STATUS;
+      mfaStatus = NO_ACCOUNT;
+      userStatus = NO_ACCOUNT;
     }
 
-    UserAccountDetailsDto response = new UserAccountDetailsDto(userStatus);
+    UserAccountDetailsDto response = new UserAccountDetailsDto(mfaStatus, userStatus);
     return ResponseEntity.ok(response);
   }
 }
