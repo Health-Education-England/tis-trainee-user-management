@@ -199,6 +199,19 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: ${{ runner.os }}-gradle
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_MAVEN_USERNAME }}
+          aws-secret-access-key: ${{ secrets.AWS_MAVEN_PASSWORD }}
+          aws-region: eu-west-1
+
+      - name: Add CodeArtifact env var
+        run: |
+          CODEARTIFACT_AUTH_TOKEN=`aws codeartifact get-authorization-token --domain hee --domain-owner 430723991443 --query authorizationToken --output text --duration-seconds 900`
+          echo CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN >> $GITHUB_ENV
+          echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
+
       - name: Run quality analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
