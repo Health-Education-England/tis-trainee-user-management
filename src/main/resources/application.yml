@@ -18,3 +18,8 @@ cloud:
   aws:
     region:
       static: ${AWS_REGION}
+
+profile:
+  server:
+    name: ${PROFILE_HOST:localhost}
+    port: ${PROFILE_PORT:8082}

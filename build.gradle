@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "0.1.0"
+version = "0.1.1"
 
 configurations {
   compileOnly {
@@ -20,6 +20,14 @@ configurations {
 
 repositories {
   mavenCentral()
+
+  maven {
+    url "https://hee-430723991443.d.codeartifact.eu-west-1.amazonaws.com/maven/Health-Education-England/"
+    credentials {
+      username "aws"
+      password System.env.CODEARTIFACT_AUTH_TOKEN
+    }
+  }
 }
 
 dependencyManagement {
@@ -32,9 +40,13 @@ dependencies {
   // Spring Boot starters
   implementation "org.springframework.boot:spring-boot-starter-actuator"
   implementation "org.springframework.boot:spring-boot-starter-web"
+  implementation "org.springframework.boot:spring-boot-starter-security"
   testImplementation("org.springframework.boot:spring-boot-starter-test") {
     exclude group: "org.junit.vintage", module: "junit-vintage-engine"
   }
+
+  implementation "com.transformuk.hee:tis-security-jwt:5.1.4"
+  implementation "com.transformuk.hee:profile-client:3.1.1"
 
   // Lombok
   compileOnly "org.projectlombok:lombok"
