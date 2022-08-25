@@ -64,8 +64,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.codeartifact-username }}
-          aws-secret-access-key: ${{ secrets.codeartifact-password }}
+          aws-access-key-id: ${{ secrets.AWS_MAVEN_USERNAME }}
+          aws-secret-access-key: ${{ secrets.AWS_MAVEN_PASSWORD }}
           aws-region: eu-west-1
 
       - name: Add CodeArtifact env var
@@ -108,8 +108,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.codeartifact-username }}
-          aws-secret-access-key: ${{ secrets.codeartifact-password }}
+          aws-access-key-id: ${{ secrets.AWS_MAVEN_USERNAME }}
+          aws-secret-access-key: ${{ secrets.AWS_MAVEN_PASSWORD }}
           aws-region: eu-west-1
 
       - name: Add CodeArtifact env var
@@ -152,8 +152,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.codeartifact-username }}
-          aws-secret-access-key: ${{ secrets.codeartifact-password }}
+          aws-access-key-id: ${{ secrets.AWS_MAVEN_USERNAME }}
+          aws-secret-access-key: ${{ secrets.AWS_MAVEN_PASSWORD }}
           aws-region: eu-west-1
 
       - name: Add CodeArtifact env var
@@ -247,8 +247,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.codeartifact-username }}
-          aws-secret-access-key: ${{ secrets.codeartifact-password }}
+          aws-access-key-id: ${{ secrets.AWS_MAVEN_USERNAME }}
+          aws-secret-access-key: ${{ secrets.AWS_MAVEN_PASSWORD }}
           aws-region: eu-west-1
 
       - name: Add CodeArtifact env var
