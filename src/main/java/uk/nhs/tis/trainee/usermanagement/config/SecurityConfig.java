@@ -49,6 +49,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
+  private static final String API_PATH = "/api/**";
+
   private final JwtAuthenticationEntryPoint unauthorizedHandler;
   private final RestAccessDeniedHandler accessDeniedHandler;
   private final JwtAuthenticationProvider authenticationProvider;
@@ -69,7 +71,7 @@ public class SecurityConfig {
   @Bean
   public JwtAuthenticationTokenFilter authenticationTokenFilterBean() {
     JwtAuthenticationTokenFilter authenticationTokenFilter = new JwtAuthenticationTokenFilter(
-        "/api/**");
+        API_PATH);
     authenticationTokenFilter.setAuthenticationManager(authenticationManager());
     authenticationTokenFilter
         .setAuthenticationSuccessHandler(new JwtAuthenticationSuccessHandler());
@@ -82,8 +84,8 @@ public class SecurityConfig {
         // we don't need CSRF because our token is invulnerable
         .csrf().disable()
         .authorizeRequests()
-        .antMatchers(HttpMethod.GET, "/api/**").hasAuthority("trainee-support:view")
-        .antMatchers(HttpMethod.POST, "/api/**").hasAuthority("trainee-support:modify")
+        .antMatchers(HttpMethod.GET, API_PATH).hasAuthority("trainee-support:view")
+        .antMatchers(HttpMethod.POST, API_PATH).hasAuthority("trainee-support:modify")
         .anyRequest().authenticated()
         .and()
         .exceptionHandling().authenticationEntryPoint(unauthorizedHandler)

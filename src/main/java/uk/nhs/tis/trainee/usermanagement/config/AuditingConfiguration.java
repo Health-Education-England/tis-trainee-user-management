@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Required by TIS Security
+ * Required by TIS Security.
  */
 @Configuration
 public class AuditingConfiguration {
