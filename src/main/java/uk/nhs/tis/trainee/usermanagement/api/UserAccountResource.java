@@ -22,7 +22,7 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
-import com.amazonaws.services.cognitoidp.model.AWSCognitoIdentityProviderException;
+import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
@@ -108,6 +108,24 @@ public class UserAccountResource {
 
     cognitoIdp.adminSetUserMFAPreference(request);
     log.info("MFA reset for user '{}'.", username);
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Delete TSS Cognito account for the given user.
+   *
+   * @param username The username of the user.
+   * @return 204 No Content, if successful.
+   */
+  @PostMapping("/delete-account/{username}")
+  ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
+    log.info("Delete Cognito account requested for user '{}'.", username);
+    AdminDeleteUserRequest request = new AdminDeleteUserRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+
+    cognitoIdp.adminDeleteUser(request);
+    log.info("Delete Cognito account for user '{}'.", username);
     return ResponseEntity.noContent().build();
   }
 }
