@@ -177,7 +177,7 @@ class UserAccountResourceTest {
     when(cognitoIdp.adminDeleteUser(requestCaptor.capture())).thenReturn(
         new AdminDeleteUserResult());
 
-    mockMvc.perform(delete("/api/user-account/delete/{username}", USERNAME)
+    mockMvc.perform(delete("/api/user-account/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 

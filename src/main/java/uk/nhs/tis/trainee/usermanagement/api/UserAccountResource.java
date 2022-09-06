@@ -118,7 +118,7 @@ public class UserAccountResource {
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @DeleteMapping("/delete/{username}")
+  @DeleteMapping("/{username}")
   ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
     log.info("Delete Cognito account requested for user '{}'.", username);
     AdminDeleteUserRequest request = new AdminDeleteUserRequest();
