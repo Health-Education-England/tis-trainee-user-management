@@ -32,6 +32,7 @@ import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -117,7 +118,7 @@ public class UserAccountResource {
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/delete-account/{username}")
+  @DeleteMapping("/delete/{username}")
   ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
     log.info("Delete Cognito account requested for user '{}'.", username);
     AdminDeleteUserRequest request = new AdminDeleteUserRequest();
@@ -125,7 +126,7 @@ public class UserAccountResource {
     request.setUsername(username);
 
     cognitoIdp.adminDeleteUser(request);
-    log.info("Delete Cognito account for user '{}'.", username);
+    log.info("Deleted Cognito account for user '{}'.", username);
     return ResponseEntity.noContent().build();
   }
 }

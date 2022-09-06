@@ -26,6 +26,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -176,7 +177,7 @@ class UserAccountResourceTest {
     when(cognitoIdp.adminDeleteUser(requestCaptor.capture())).thenReturn(
         new AdminDeleteUserResult());
 
-    mockMvc.perform(post("/api/user-account/delete-account/{username}", USERNAME)
+    mockMvc.perform(delete("/api/user-account/delete/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
