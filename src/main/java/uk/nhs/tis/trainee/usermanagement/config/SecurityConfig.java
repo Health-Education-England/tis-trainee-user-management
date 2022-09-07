@@ -86,6 +86,7 @@ public class SecurityConfig {
         .authorizeRequests()
         .antMatchers(HttpMethod.GET, API_PATH).hasAuthority("trainee-support:view")
         .antMatchers(HttpMethod.POST, API_PATH).hasAuthority("trainee-support:modify")
+        .antMatchers(HttpMethod.DELETE, API_PATH).hasAuthority("trainee-support:modify")
         .anyRequest().authenticated()
         .and()
         .exceptionHandling().authenticationEntryPoint(unauthorizedHandler)

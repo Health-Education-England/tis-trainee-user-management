@@ -26,12 +26,15 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
+import com.amazonaws.services.cognitoidp.model.AdminDeleteUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
@@ -164,5 +167,21 @@ class UserAccountResourceTest {
     AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
     assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
         is(false));
+  }
+
+  @Test
+  void shouldDeleteCognitoAccount() throws Exception {
+    ArgumentCaptor<AdminDeleteUserRequest> requestCaptor = ArgumentCaptor.forClass(
+        AdminDeleteUserRequest.class);
+
+    when(cognitoIdp.adminDeleteUser(requestCaptor.capture())).thenReturn(
+        new AdminDeleteUserResult());
+
+    mockMvc.perform(delete("/api/user-account/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isNoContent());
+
+    AdminDeleteUserRequest request = requestCaptor.getValue();
+    assertThat("Unexpected delete account username.", request.getUsername(), is(USERNAME));
   }
 }

@@ -22,7 +22,7 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
-import com.amazonaws.services.cognitoidp.model.AWSCognitoIdentityProviderException;
+import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
@@ -32,6 +32,7 @@ import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -108,6 +109,24 @@ public class UserAccountResource {
 
     cognitoIdp.adminSetUserMFAPreference(request);
     log.info("MFA reset for user '{}'.", username);
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Delete TSS Cognito account for the given user.
+   *
+   * @param username The username of the user.
+   * @return 204 No Content, if successful.
+   */
+  @DeleteMapping("/{username}")
+  ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
+    log.info("Delete Cognito account requested for user '{}'.", username);
+    AdminDeleteUserRequest request = new AdminDeleteUserRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+
+    cognitoIdp.adminDeleteUser(request);
+    log.info("Deleted Cognito account for user '{}'.", username);
     return ResponseEntity.noContent().build();
   }
 }
