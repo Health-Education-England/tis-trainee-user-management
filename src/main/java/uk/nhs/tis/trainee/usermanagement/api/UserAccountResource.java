@@ -22,9 +22,11 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
@@ -53,6 +55,9 @@ public class UserAccountResource {
 
   @Value("${application.aws.cognito.user-pool-id}")
   private String userPoolId;
+
+  @Value("${application.aws.cognito.consultation-group}")
+  private String consultationGroup;
 
   private final AWSCognitoIdentityProvider cognitoIdp;
 
@@ -127,6 +132,44 @@ public class UserAccountResource {
 
     cognitoIdp.adminDeleteUser(request);
     log.info("Deleted Cognito account for user '{}'.", username);
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Add the given user into beta consultation group.
+   *
+   * @param username The username of the user.
+   * @return 204 No Content, if successful.
+   */
+  @PostMapping("/add-consultation-group/{username}")
+  ResponseEntity<Void> addUsertoConsultationGroup(@PathVariable String username) {
+    log.info("DSP beta consultation group enrolment requested for user '{}'.", username);
+    AdminAddUserToGroupRequest request = new AdminAddUserToGroupRequest();
+    request.setUserPoolId(userPoolId);
+    request.setGroupName(consultationGroup);
+    request.setUsername(username);
+
+    cognitoIdp.adminAddUserToGroup(request);
+    log.info("User enrolled in DSP beta consultation group'{}'.", username);
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Remove the given user from DSP beta consultation group.
+   *
+   * @param username The username of the user.
+   * @return 204 No Content, if successful.
+   */
+  @PostMapping("/remove-consultation-group/{username}")
+  ResponseEntity<Void> removeUserFromConsultationGroup(@PathVariable String username) {
+    log.info("DSP beta consultation group unenrolment requested for user '{}'.", username);
+    AdminRemoveUserFromGroupRequest request = new AdminRemoveUserFromGroupRequest();
+    request.setUserPoolId(userPoolId);
+    request.setGroupName(consultationGroup);
+    request.setUsername(username);
+
+    cognitoIdp.adminRemoveUserFromGroup(request);
+    log.info("User unenrolled from DSP beta consultation group'{}'.", username);
     return ResponseEntity.noContent().build();
   }
 }
