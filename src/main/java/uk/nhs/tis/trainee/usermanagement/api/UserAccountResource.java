@@ -39,6 +39,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 
@@ -52,12 +53,13 @@ public class UserAccountResource {
 
   private static final String NO_ACCOUNT = "NO_ACCOUNT";
   private static final String NO_MFA = "NO_MFA";
+  private static final String DSP_CONSULTATION = "dsp-consultation";
 
   @Value("${application.aws.cognito.user-pool-id}")
   private String userPoolId;
 
   @Value("${application.aws.cognito.consultation-group}")
-  private String consultationGroup;
+  private String consultationGroupName;
 
   private final AWSCognitoIdentityProvider cognitoIdp;
 
@@ -136,40 +138,64 @@ public class UserAccountResource {
   }
 
   /**
-   * Add the given user into beta consultation group.
+   * Add the given user into Cognito user group.
    *
+   * @param usergroup The name of the Cognito user group.
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/add-consultation-group/{username}")
-  ResponseEntity<Void> addUsertoConsultationGroup(@PathVariable String username) {
-    log.info("DSP beta consultation group enrolment requested for user '{}'.", username);
+  @PostMapping("/add-usergroup")
+  ResponseEntity<Void> addToUserGroup(
+      @RequestParam(value = "usergroup", required = true) String usergroup,
+      @RequestParam(value = "username", required = true) String username
+  ) {
+    String groupName;
+    log.info("User '{}' enrolment to user group '{}' requested.", username, usergroup);
+    if (usergroup.equals(DSP_CONSULTATION)) {
+      groupName = consultationGroupName;
+    } else {
+      log.warn("Invalid user group: '{}'", usergroup);
+      return ResponseEntity.badRequest().build();
+    }
+
     AdminAddUserToGroupRequest request = new AdminAddUserToGroupRequest();
     request.setUserPoolId(userPoolId);
-    request.setGroupName(consultationGroup);
+    request.setGroupName(groupName);
     request.setUsername(username);
 
     cognitoIdp.adminAddUserToGroup(request);
-    log.info("User enrolled in DSP beta consultation group'{}'.", username);
+    log.info("User '{}' is enroled in user group name '{}'.", username, groupName);
     return ResponseEntity.noContent().build();
   }
 
   /**
-   * Remove the given user from DSP beta consultation group.
+   * Remove the given user from Cognito user group.
    *
+   * @param usergroup The name of the Cognito user group.
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/remove-consultation-group/{username}")
-  ResponseEntity<Void> removeUserFromConsultationGroup(@PathVariable String username) {
-    log.info("DSP beta consultation group unenrolment requested for user '{}'.", username);
+  @PostMapping("/remove-usergroup")
+  ResponseEntity<Void> removeFromUserGroup(
+      @RequestParam(value = "usergroup", required = true) String usergroup,
+      @RequestParam(value = "username", required = true) String username
+  ) {
+    String groupName;
+    log.info("User '{}' withdraw from user group '{}' requested.", username, usergroup);
+    if (usergroup.equals(DSP_CONSULTATION)) {
+      groupName = consultationGroupName;
+    } else {
+      log.warn("Invalid user group: '{}'", usergroup);
+      return ResponseEntity.badRequest().build();
+    }
+
     AdminRemoveUserFromGroupRequest request = new AdminRemoveUserFromGroupRequest();
     request.setUserPoolId(userPoolId);
-    request.setGroupName(consultationGroup);
+    request.setGroupName(groupName);
     request.setUsername(username);
 
     cognitoIdp.adminRemoveUserFromGroup(request);
-    log.info("User unenrolled from DSP beta consultation group'{}'.", username);
+    log.info("User '{}' is withdrawn from user group name '{}'.", username, groupName);
     return ResponseEntity.noContent().build();
   }
 }
