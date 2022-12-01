@@ -55,7 +55,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class UserAccountResourceTest {
 
   private static final String USERNAME = "username";
-  private static final String DSP_CONSULTATION = "dsp-consultation";
   private static final String CONSULTATION_GROUP_NAME = "dsp-beta-consultation-group";
   private static final String COGNITO_USER_POOL_ID = "eu-west-2_wTTevmrcD";
 
@@ -196,16 +195,14 @@ class UserAccountResourceTest {
   }
 
   @Test
-  void shouldAddToDspConsultationUserGroup() throws Exception {
+  void shouldEnrollDspConsultationGroup() throws Exception {
     ArgumentCaptor<AdminAddUserToGroupRequest> requestCaptor = ArgumentCaptor.forClass(
         AdminAddUserToGroupRequest.class);
 
     when(cognitoIdp.adminAddUserToGroup(requestCaptor.capture())).thenReturn(
         new AdminAddUserToGroupResult());
 
-    mockMvc.perform(post("/api/user-account/add-usergroup", USERNAME)
-            .param("usergroup", DSP_CONSULTATION)
-            .param("username", USERNAME)
+    mockMvc.perform(post("/api/user-account/dsp-consultants/enroll/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
@@ -216,31 +213,14 @@ class UserAccountResourceTest {
   }
 
   @Test
-  void shouldNotAddToUserGroupIfGroupInvalid() throws Exception {
-    ArgumentCaptor<AdminAddUserToGroupRequest> requestCaptor = ArgumentCaptor.forClass(
-        AdminAddUserToGroupRequest.class);
-
-    when(cognitoIdp.adminAddUserToGroup(requestCaptor.capture())).thenReturn(
-        new AdminAddUserToGroupResult());
-
-    mockMvc.perform(post("/api/user-account/add-usergroup", USERNAME)
-            .param("usergroup", "dummy")
-            .param("username", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void shouldRemoveFromDspConsultationUserGroup() throws Exception {
+  void shouldWithdrawDspConsultation() throws Exception {
     ArgumentCaptor<AdminRemoveUserFromGroupRequest> requestCaptor = ArgumentCaptor.forClass(
         AdminRemoveUserFromGroupRequest.class);
 
     when(cognitoIdp.adminRemoveUserFromGroup(requestCaptor.capture())).thenReturn(
         new AdminRemoveUserFromGroupResult());
 
-    mockMvc.perform(post("/api/user-account/remove-usergroup", USERNAME)
-            .param("usergroup", DSP_CONSULTATION)
-            .param("username", USERNAME)
+    mockMvc.perform(post("/api/user-account/dsp-consultants/withdraw/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
@@ -248,20 +228,5 @@ class UserAccountResourceTest {
     assertThat("Unexpected userpool.", request.getUserPoolId(), is(COGNITO_USER_POOL_ID));
     assertThat("Unexpected user group.", request.getGroupName(), is(CONSULTATION_GROUP_NAME));
     assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
-  }
-
-  @Test
-  void shouldNotRemoveFromUserGroupIfGroupInvalid() throws Exception {
-    ArgumentCaptor<AdminRemoveUserFromGroupRequest> requestCaptor = ArgumentCaptor.forClass(
-        AdminRemoveUserFromGroupRequest.class);
-
-    when(cognitoIdp.adminRemoveUserFromGroup(requestCaptor.capture())).thenReturn(
-        new AdminRemoveUserFromGroupResult());
-
-    mockMvc.perform(post("/api/user-account/remove-usergroup", USERNAME)
-            .param("usergroup", "dummy")
-            .param("username", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isBadRequest());
   }
 }
