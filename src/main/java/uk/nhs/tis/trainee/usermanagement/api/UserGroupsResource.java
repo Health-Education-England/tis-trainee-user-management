@@ -22,13 +22,20 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserRequest;
+import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
+import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -39,94 +46,91 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.dto.UserGroupListDto;
 
 /**
- * An API for interacting with user accounts.
+ * An API for interacting with user groups.
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/user-account")
-public class UserAccountResource {
-
-  private static final String NO_ACCOUNT = "NO_ACCOUNT";
-  private static final String NO_MFA = "NO_MFA";
+@RequestMapping("/api/user-groups")
+public class UserGroupsResource {
 
   @Value("${application.aws.cognito.user-pool-id}")
   private String userPoolId;
 
+  @Value("${application.aws.cognito.consultation-group}")
+  private String consultationGroupName;
+
   private final AWSCognitoIdentityProvider cognitoIdp;
 
-  UserAccountResource(AWSCognitoIdentityProvider cognitoIdp) {
+  UserGroupsResource(AWSCognitoIdentityProvider cognitoIdp) {
     this.cognitoIdp = cognitoIdp;
   }
 
   /**
-   * Get the user account details for the account associated with the given username.
+   * List assigned groups of the given user.
    *
-   * @param username The username for the account.
-   * @return The user account details.
+   * @param username The username of the user.
+   * @return A list of user group names that user enrolled.
    */
-  @GetMapping("/details/{username}")
-  ResponseEntity<UserAccountDetailsDto> getUserAccountDetails(@PathVariable String username) {
-    log.info("Account details requested for user '{}'.", username);
-    AdminGetUserRequest request = new AdminGetUserRequest();
+  @GetMapping("/{username}")
+  ResponseEntity<UserGroupListDto> listUserGroups(@PathVariable String username) {
+    log.info("User groups list requested for user '{}'.", username);
+    AdminListGroupsForUserRequest  request = new AdminListGroupsForUserRequest();
     request.setUserPoolId(userPoolId);
     request.setUsername(username);
 
-    String mfaStatus;
-    String userStatus;
+    List<String> groups = new ArrayList<>();
 
     try {
-      AdminGetUserResult result = cognitoIdp.adminGetUser(request);
-      String preferredMfa = result.getPreferredMfaSetting();
-
-      mfaStatus = preferredMfa == null ? NO_MFA : preferredMfa;
-      userStatus = result.getUserStatus();
+      AdminListGroupsForUserResult result = cognitoIdp.adminListGroupsForUser(request);
+      groups = result.getGroups().stream()
+          .map(GroupType::getGroupName)
+          .toList();
     } catch (UserNotFoundException e) {
       log.info("User '{}' not found.", username);
-      mfaStatus = NO_ACCOUNT;
-      userStatus = NO_ACCOUNT;
     }
 
-    UserAccountDetailsDto response = new UserAccountDetailsDto(mfaStatus, userStatus);
+    UserGroupListDto response = new UserGroupListDto(groups);
     return ResponseEntity.ok(response);
   }
 
   /**
-   * Reset the MFA for the given user.
+   * Add the given user into DSP Beta consultation group.
    *
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/reset-mfa/{username}")
-  ResponseEntity<Void> resetUserAccountMfa(@PathVariable String username) {
-    log.info("MFA reset requested for user '{}'.", username);
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
+  @PostMapping("/dsp-consultants/enroll/{username}")
+  ResponseEntity<Void> enrollDspConsultationGroup(@PathVariable String username) {
+    log.info("User '{}' enrolment to DSP Beta Consultation group requested.", username);
+    AdminAddUserToGroupRequest request = new AdminAddUserToGroupRequest();
     request.setUserPoolId(userPoolId);
+    request.setGroupName(consultationGroupName);
     request.setUsername(username);
-    request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
-    request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
 
-    cognitoIdp.adminSetUserMFAPreference(request);
-    log.info("MFA reset for user '{}'.", username);
+    cognitoIdp.adminAddUserToGroup(request);
+    log.info("User '{}' is enroled in DSP Beta Consultation user group.", username);
     return ResponseEntity.noContent().build();
   }
 
   /**
-   * Delete TSS Cognito account for the given user.
+   * Remove the given user from DSP Beta consultation group.
    *
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @DeleteMapping("/{username}")
-  ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
-    log.info("Delete Cognito account requested for user '{}'.", username);
-    AdminDeleteUserRequest request = new AdminDeleteUserRequest();
+  @PostMapping("/dsp-consultants/withdraw/{username}")
+  ResponseEntity<Void> withdrawDspConsultationGroup(@PathVariable String username) {
+    log.info("User '{}' withdraw from DSP Beta Consultation group requested.", username);
+    AdminRemoveUserFromGroupRequest request = new AdminRemoveUserFromGroupRequest();
     request.setUserPoolId(userPoolId);
+    request.setGroupName(consultationGroupName);
     request.setUsername(username);
 
-    cognitoIdp.adminDeleteUser(request);
-    log.info("Deleted Cognito account for user '{}'.", username);
+    cognitoIdp.adminRemoveUserFromGroup(request);
+    log.info("User '{}' is withdrawn from DSP Beta Consultation group.", username);
     return ResponseEntity.noContent().build();
   }
 }
