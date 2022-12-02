@@ -26,11 +26,16 @@ import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserRequest;
+import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
+import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +46,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.dto.UserGroupListDto;
 
 /**
  * An API for interacting with user accounts.
@@ -133,6 +139,34 @@ public class UserAccountResource {
     cognitoIdp.adminDeleteUser(request);
     log.info("Deleted Cognito account for user '{}'.", username);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * List assigned groups of the given user.
+   *
+   * @param username The username of the user.
+   * @return 204 No Content, if successful.
+   */
+  @GetMapping("/user-groups/{username}")
+  ResponseEntity<UserGroupListDto> checkGroup(@PathVariable String username) {
+    log.info("User groups list requested for user '{}'.", username);
+    AdminListGroupsForUserRequest  request = new AdminListGroupsForUserRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+
+    List<String> groups = new ArrayList<>();
+
+    try {
+      AdminListGroupsForUserResult result = cognitoIdp.adminListGroupsForUser(request);
+      groups = result.getGroups().stream()
+          .map(GroupType::getGroupName)
+          .toList();
+    } catch (UserNotFoundException e) {
+      log.info("User '{}' not found.", username);
+    }
+
+    UserGroupListDto response = new UserGroupListDto(groups);
+    return ResponseEntity.ok(response);
   }
 
   /**
