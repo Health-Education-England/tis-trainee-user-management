@@ -11,7 +11,7 @@ application:
   aws:
     cognito:
       user-pool-id: ${COGNITO_USER_POOL_ID}
-      consultation-group: ${COGNITO_CONSULTATION_GROUP:}
+      dsp-consultant-group: ${COGNITO_DSP_CONSULTANT_GROUP}
     sqs:
       request: ${REQUEST_QUEUE_URL:}
 

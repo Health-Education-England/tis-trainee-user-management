@@ -39,12 +39,12 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 public class UserGroupsResource {
 
   private final UserAccountService service;
-  private final String consultationGroupName;
+  private final String dspConsultantGroupName;
 
   UserGroupsResource(UserAccountService service,
-      @Value("${application.aws.cognito.consultation-group}") String consultationGroupName) {
+      @Value("${application.aws.cognito.dsp-consultant-group}") String dspConsultantGroupName) {
     this.service = service;
-    this.consultationGroupName = consultationGroupName;
+    this.dspConsultantGroupName = dspConsultantGroupName;
   }
 
   /**
@@ -56,7 +56,7 @@ public class UserGroupsResource {
   @PostMapping("/dsp-consultants/enroll/{username}")
   ResponseEntity<Void> enrollDspConsultationGroup(@PathVariable String username) {
     log.info("User '{}' enrollment to DSP Beta Consultation group requested.", username);
-    service.enrollToUserGroup(username, consultationGroupName);
+    service.enrollToUserGroup(username, dspConsultantGroupName);
     return ResponseEntity.noContent().build();
   }
 
@@ -69,7 +69,7 @@ public class UserGroupsResource {
   @PostMapping("/dsp-consultants/withdraw/{username}")
   ResponseEntity<Void> withdrawDspConsultationGroup(@PathVariable String username) {
     log.info("User '{}' withdrawal from DSP Beta Consultation group requested.", username);
-    service.withdrawFromUserGroup(username, consultationGroupName);
+    service.withdrawFromUserGroup(username, dspConsultantGroupName);
     return ResponseEntity.noContent().build();
   }
 }

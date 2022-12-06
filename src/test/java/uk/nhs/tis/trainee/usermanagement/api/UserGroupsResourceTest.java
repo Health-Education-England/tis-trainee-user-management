@@ -36,7 +36,7 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 class UserGroupsResourceTest {
 
   private static final String USERNAME = "username";
-  private static final String CONSULTATION_GROUP_NAME = "dsp-beta-consultation-group";
+  private static final String DSP_CONSULTANT_GROUP = "dsp-consultant-group";
 
   private MockMvc mockMvc;
   private UserAccountService service;
@@ -44,7 +44,7 @@ class UserGroupsResourceTest {
   @BeforeEach
   void setUp() {
     service = mock(UserAccountService.class);
-    UserGroupsResource resource = new UserGroupsResource(service, CONSULTATION_GROUP_NAME);
+    UserGroupsResource resource = new UserGroupsResource(service, DSP_CONSULTANT_GROUP);
     mockMvc = MockMvcBuilders.standaloneSetup(resource).build();
   }
 
@@ -54,7 +54,7 @@ class UserGroupsResourceTest {
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).enrollToUserGroup(USERNAME, CONSULTATION_GROUP_NAME);
+    verify(service).enrollToUserGroup(USERNAME, DSP_CONSULTANT_GROUP);
   }
 
   @Test
@@ -63,6 +63,6 @@ class UserGroupsResourceTest {
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).withdrawFromUserGroup(USERNAME, CONSULTATION_GROUP_NAME);
+    verify(service).withdrawFromUserGroup(USERNAME, DSP_CONSULTANT_GROUP);
   }
 }
