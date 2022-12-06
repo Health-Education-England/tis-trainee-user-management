@@ -21,10 +21,8 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,156 +30,63 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
-import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminDeleteUserResult;
-import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
-import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
-import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
-import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
-import com.amazonaws.services.cognitoidp.model.UserStatusType;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
 class UserAccountResourceTest {
 
   private static final String USERNAME = "username";
 
   private MockMvc mockMvc;
-  private AWSCognitoIdentityProvider cognitoIdp;
+  private UserAccountService service;
 
   @BeforeEach
   void setUp() {
-    cognitoIdp = mock(AWSCognitoIdentityProvider.class);
-    UserAccountResource resource = new UserAccountResource(cognitoIdp);
+    service = mock(UserAccountService.class);
+    UserAccountResource resource = new UserAccountResource(service);
     mockMvc = MockMvcBuilders.standaloneSetup(resource).build();
   }
 
   @Test
-  void shouldReturnNoAccountWhenUserNotFound() throws Exception {
-    when(cognitoIdp.adminGetUser(any())).thenThrow(UserNotFoundException.class);
+  void shouldGetUserAccountDetails() throws Exception {
+    List<String> groups = List.of("GROUP_1", "GROUP_2");
+    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
+        "USER_STATUS", groups);
+
+    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
 
     mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.mfaStatus").value("NO_ACCOUNT"))
-        .andExpect(jsonPath("$.userStatus").value("NO_ACCOUNT"));
+        .andExpect(jsonPath("$.mfaStatus").value("MFA_STATUS"))
+        .andExpect(jsonPath("$.userStatus").value("USER_STATUS"))
+        .andExpect(jsonPath("$.groups").isArray())
+        .andExpect(jsonPath("$.groups.length()").value(2))
+        .andExpect(jsonPath("$.groups[0]").value("GROUP_1"))
+        .andExpect(jsonPath("$.groups[1]").value("GROUP_2"));
   }
 
   @Test
-  void shouldGetUserStatusWhenUserStatusConfirmed() throws Exception {
-    AdminGetUserResult result = new AdminGetUserResult();
-    result.setUserStatus(UserStatusType.CONFIRMED);
-
-    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
-
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.userStatus").value(UserStatusType.CONFIRMED.toString()));
-  }
-
-  @Test
-  void shouldGetUserStatusWhenUserStatusUnconfirmed() throws Exception {
-    AdminGetUserResult result = new AdminGetUserResult();
-    result.setUserStatus(UserStatusType.UNCONFIRMED);
-
-    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
-
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.userStatus").value(UserStatusType.UNCONFIRMED.toString()));
-  }
-
-  @Test
-  void shouldGetUserStatusWhenUserStatusForcedPasswordChange() throws Exception {
-    AdminGetUserResult result = new AdminGetUserResult();
-    result.setUserStatus(UserStatusType.FORCE_CHANGE_PASSWORD);
-
-    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
-
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.userStatus").value(UserStatusType.FORCE_CHANGE_PASSWORD.toString()));
-  }
-
-  @Test
-  void shouldReturnNoMfaWhenNoPreferredMfa() throws Exception {
-    AdminGetUserResult result = new AdminGetUserResult();
-
-    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
-
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.mfaStatus").value("NO_MFA"));
-  }
-
-  @Test
-  void shouldReturnPreferredMfaWhenPreferredMfa() throws Exception {
-    AdminGetUserResult result = new AdminGetUserResult();
-    result.setPreferredMfaSetting("PREFERRED_MFA");
-
-    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
-
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.mfaStatus").value("PREFERRED_MFA"));
-  }
-
-  @Test
-  void shouldResetSmsMfa() throws Exception {
-    ArgumentCaptor<AdminSetUserMFAPreferenceRequest> requestCaptor = ArgumentCaptor.forClass(
-        AdminSetUserMFAPreferenceRequest.class);
-
-    when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
-        new AdminSetUserMFAPreferenceResult());
-
+  void shouldResetMfa() throws Exception {
     mockMvc.perform(post("/api/user-account/reset-mfa/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
-    assertThat("Unexpected SMS enabled flag.", request.getSMSMfaSettings().getEnabled(), is(false));
-  }
-
-  @Test
-  void shouldResetTotpMfa() throws Exception {
-    ArgumentCaptor<AdminSetUserMFAPreferenceRequest> requestCaptor = ArgumentCaptor.forClass(
-        AdminSetUserMFAPreferenceRequest.class);
-
-    when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
-        new AdminSetUserMFAPreferenceResult());
-
-    mockMvc.perform(post("/api/user-account/reset-mfa/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isNoContent());
-
-    AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
-    assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
-        is(false));
+    verify(service).resetUserAccountMfa(USERNAME);
   }
 
   @Test
   void shouldDeleteCognitoAccount() throws Exception {
-    ArgumentCaptor<AdminDeleteUserRequest> requestCaptor = ArgumentCaptor.forClass(
-        AdminDeleteUserRequest.class);
-
-    when(cognitoIdp.adminDeleteUser(requestCaptor.capture())).thenReturn(
-        new AdminDeleteUserResult());
-
     mockMvc.perform(delete("/api/user-account/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    AdminDeleteUserRequest request = requestCaptor.getValue();
-    assertThat("Unexpected delete account username.", request.getUsername(), is(USERNAME));
+    verify(service).deleteCognitoAccount(USERNAME);
   }
 }

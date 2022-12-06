@@ -21,6 +21,7 @@
 
 package uk.nhs.tis.trainee.usermanagement.dto;
 
+import java.util.List;
 import lombok.Value;
 
 @Value
@@ -28,4 +29,5 @@ public class UserAccountDetailsDto {
 
   String mfaStatus;
   String userStatus;
+  List<String> groups;
 }

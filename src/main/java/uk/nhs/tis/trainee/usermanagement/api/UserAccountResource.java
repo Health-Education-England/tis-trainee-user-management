@@ -21,16 +21,7 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
-import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
-import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
-import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
-import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
-import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
-import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +30,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
 /**
  * An API for interacting with user accounts.
@@ -48,16 +40,10 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 @RequestMapping("/api/user-account")
 public class UserAccountResource {
 
-  private static final String NO_ACCOUNT = "NO_ACCOUNT";
-  private static final String NO_MFA = "NO_MFA";
+  private final UserAccountService service;
 
-  @Value("${application.aws.cognito.user-pool-id}")
-  private String userPoolId;
-
-  private final AWSCognitoIdentityProvider cognitoIdp;
-
-  UserAccountResource(AWSCognitoIdentityProvider cognitoIdp) {
-    this.cognitoIdp = cognitoIdp;
+  UserAccountResource(UserAccountService service) {
+    this.service = service;
   }
 
   /**
@@ -69,27 +55,7 @@ public class UserAccountResource {
   @GetMapping("/details/{username}")
   ResponseEntity<UserAccountDetailsDto> getUserAccountDetails(@PathVariable String username) {
     log.info("Account details requested for user '{}'.", username);
-    AdminGetUserRequest request = new AdminGetUserRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-
-    String mfaStatus;
-    String userStatus;
-
-    try {
-      AdminGetUserResult result = cognitoIdp.adminGetUser(request);
-      String preferredMfa = result.getPreferredMfaSetting();
-
-      mfaStatus = preferredMfa == null ? NO_MFA : preferredMfa;
-      userStatus = result.getUserStatus();
-    } catch (UserNotFoundException e) {
-      log.info("User '{}' not found.", username);
-      mfaStatus = NO_ACCOUNT;
-      userStatus = NO_ACCOUNT;
-    }
-
-    UserAccountDetailsDto response = new UserAccountDetailsDto(mfaStatus, userStatus);
-    return ResponseEntity.ok(response);
+    return ResponseEntity.ok(service.getUserAccountDetails(username));
   }
 
   /**
@@ -101,14 +67,7 @@ public class UserAccountResource {
   @PostMapping("/reset-mfa/{username}")
   ResponseEntity<Void> resetUserAccountMfa(@PathVariable String username) {
     log.info("MFA reset requested for user '{}'.", username);
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-    request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
-    request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
-
-    cognitoIdp.adminSetUserMFAPreference(request);
-    log.info("MFA reset for user '{}'.", username);
+    service.resetUserAccountMfa(username);
     return ResponseEntity.noContent().build();
   }
 
@@ -121,12 +80,7 @@ public class UserAccountResource {
   @DeleteMapping("/{username}")
   ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
     log.info("Delete Cognito account requested for user '{}'.", username);
-    AdminDeleteUserRequest request = new AdminDeleteUserRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-
-    cognitoIdp.adminDeleteUser(request);
-    log.info("Deleted Cognito account for user '{}'.", username);
+    service.deleteCognitoAccount(username);
     return ResponseEntity.noContent().build();
   }
 }
