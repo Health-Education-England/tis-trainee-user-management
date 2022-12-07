@@ -23,25 +23,20 @@ package uk.nhs.tis.trainee.usermanagement.api;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
-class UserAccountResourceTest {
+class UserGroupsResourceTest {
 
   private static final String USERNAME = "username";
+  private static final String DSP_CONSULTANT_GROUP = "dsp-consultant-group";
 
   private MockMvc mockMvc;
   private UserAccountService service;
@@ -49,44 +44,25 @@ class UserAccountResourceTest {
   @BeforeEach
   void setUp() {
     service = mock(UserAccountService.class);
-    UserAccountResource resource = new UserAccountResource(service);
+    UserGroupsResource resource = new UserGroupsResource(service, DSP_CONSULTANT_GROUP);
     mockMvc = MockMvcBuilders.standaloneSetup(resource).build();
   }
 
   @Test
-  void shouldGetUserAccountDetails() throws Exception {
-    List<String> groups = List.of("GROUP_1", "GROUP_2");
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
-        "USER_STATUS", groups);
-
-    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
-
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
-            .contentType(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.mfaStatus").value("MFA_STATUS"))
-        .andExpect(jsonPath("$.userStatus").value("USER_STATUS"))
-        .andExpect(jsonPath("$.groups").isArray())
-        .andExpect(jsonPath("$.groups.length()").value(2))
-        .andExpect(jsonPath("$.groups[0]").value("GROUP_1"))
-        .andExpect(jsonPath("$.groups[1]").value("GROUP_2"));
-  }
-
-  @Test
-  void shouldResetMfa() throws Exception {
-    mockMvc.perform(post("/api/user-account/reset-mfa/{username}", USERNAME)
+  void shouldEnrollDspConsultationGroup() throws Exception {
+    mockMvc.perform(post("/api/user-groups/dsp-consultants/enroll/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).resetUserAccountMfa(USERNAME);
+    verify(service).enrollToUserGroup(USERNAME, DSP_CONSULTANT_GROUP);
   }
 
   @Test
-  void shouldDeleteCognitoAccount() throws Exception {
-    mockMvc.perform(delete("/api/user-account/{username}", USERNAME)
+  void shouldWithdrawDspConsultation() throws Exception {
+    mockMvc.perform(post("/api/user-groups/dsp-consultants/withdraw/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).deleteCognitoAccount(USERNAME);
+    verify(service).withdrawFromUserGroup(USERNAME, DSP_CONSULTANT_GROUP);
   }
 }

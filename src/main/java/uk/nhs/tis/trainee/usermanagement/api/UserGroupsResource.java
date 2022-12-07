@@ -22,65 +22,54 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
 /**
- * An API for interacting with user accounts.
+ * An API for interacting with user groups.
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/user-account")
-public class UserAccountResource {
+@RequestMapping("/api/user-groups")
+public class UserGroupsResource {
 
   private final UserAccountService service;
+  private final String dspConsultantGroupName;
 
-  UserAccountResource(UserAccountService service) {
+  UserGroupsResource(UserAccountService service,
+      @Value("${application.aws.cognito.dsp-consultant-group}") String dspConsultantGroupName) {
     this.service = service;
+    this.dspConsultantGroupName = dspConsultantGroupName;
   }
 
   /**
-   * Get the user account details for the account associated with the given username.
-   *
-   * @param username The username for the account.
-   * @return The user account details.
-   */
-  @GetMapping("/details/{username}")
-  ResponseEntity<UserAccountDetailsDto> getUserAccountDetails(@PathVariable String username) {
-    log.info("Account details requested for user '{}'.", username);
-    return ResponseEntity.ok(service.getUserAccountDetails(username));
-  }
-
-  /**
-   * Reset the MFA for the given user.
+   * Add the given user into DSP Beta consultation group.
    *
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/reset-mfa/{username}")
-  ResponseEntity<Void> resetUserAccountMfa(@PathVariable String username) {
-    log.info("MFA reset requested for user '{}'.", username);
-    service.resetUserAccountMfa(username);
+  @PostMapping("/dsp-consultants/enroll/{username}")
+  ResponseEntity<Void> enrollDspConsultationGroup(@PathVariable String username) {
+    log.info("User '{}' enrollment to DSP Beta Consultation group requested.", username);
+    service.enrollToUserGroup(username, dspConsultantGroupName);
     return ResponseEntity.noContent().build();
   }
 
   /**
-   * Delete TSS Cognito account for the given user.
+   * Remove the given user from DSP Beta consultation group.
    *
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @DeleteMapping("/{username}")
-  ResponseEntity<Void> deleteCognitoAccount(@PathVariable String username) {
-    log.info("Delete Cognito account requested for user '{}'.", username);
-    service.deleteCognitoAccount(username);
+  @PostMapping("/dsp-consultants/withdraw/{username}")
+  ResponseEntity<Void> withdrawDspConsultationGroup(@PathVariable String username) {
+    log.info("User '{}' withdrawal from DSP Beta Consultation group requested.", username);
+    service.withdrawFromUserGroup(username, dspConsultantGroupName);
     return ResponseEntity.noContent().build();
   }
 }
