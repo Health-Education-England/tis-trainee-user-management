@@ -21,6 +21,7 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
+import com.amazonaws.xray.spring.aop.XRayEnabled;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,6 +39,7 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 @Slf4j
 @RestController
 @RequestMapping("/api/user-account")
+@XRayEnabled
 public class UserAccountResource {
 
   private final UserAccountService service;

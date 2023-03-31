@@ -21,6 +21,7 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
+import com.amazonaws.xray.spring.aop.XRayEnabled;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +36,7 @@ import uk.nhs.tis.trainee.usermanagement.service.EventPublishService;
 @Slf4j
 @RestController
 @RequestMapping("/api/trainee-profile")
+@XRayEnabled
 public class TraineeProfileResource {
 
   private final EventPublishService eventPublishService;
