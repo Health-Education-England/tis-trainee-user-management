@@ -5,7 +5,7 @@ server:
 
 sentry:
   dsn: ${SENTRY_DSN:}
-  environment: ${SENTRY_ENVIRONMENT:}
+  environment: ${application.environment}
 
 application:
   aws:
@@ -14,6 +14,7 @@ application:
       dsp-consultant-group: ${COGNITO_DSP_CONSULTANT_GROUP}
     sqs:
       request: ${REQUEST_QUEUE_URL:}
+  environment: ${ENVIRONMENT:local}
 
 cloud:
   aws:
@@ -24,3 +25,9 @@ profile:
   server:
     name: ${PROFILE_HOST:localhost}
     port: ${PROFILE_PORT:8082}
+
+com:
+  amazonaws:
+    xray:
+      emitters:
+        daemon-address: ${AWS_XRAY_DAEMON_ADDRESS:}

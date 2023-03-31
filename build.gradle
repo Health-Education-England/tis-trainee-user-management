@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "1.1.0"
+version = "1.2.0"
 
 configurations {
   compileOnly {
@@ -61,10 +61,10 @@ dependencies {
   implementation "io.sentry:sentry-spring-boot-starter:$sentryVersion"
   implementation "io.sentry:sentry-logback:$sentryVersion"
 
+  // Amazon AWS
   implementation "com.amazonaws:aws-java-sdk-cognitoidp"
-
-  // Amazon SQS
   implementation "io.awspring.cloud:spring-cloud-starter-aws-messaging"
+  implementation "com.amazonaws:aws-xray-recorder-sdk-spring:2.13.0"
 }
 
 checkstyle {

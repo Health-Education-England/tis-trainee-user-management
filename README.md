@@ -19,12 +19,17 @@ gradlew bootRun
 
 #### Environmental Variables
 
-| Name                 | Description                                   | Default |
-|----------------------|-----------------------------------------------|---------|
-| AWS_REGION           | The AWS region to use.                        |         |
-| COGNITO_USER_POOL_ID | The ID of the Cognito user pool to manage.    |         |
-| SENTRY_DSN           | A Sentry error monitoring Data Source Name.   |         |
-| SENTRY_ENVIRONMENT   | The environment to log Sentry events against. | local   |
+| Name                          | Description                                             | Default   |
+|-------------------------------|---------------------------------------------------------|-----------|
+| AWS_REGION                    | The AWS region to use.                                  |           |
+| AWS_XRAY_DAEMON_ADDRESS       | The AWS XRay daemon host.                               |           |
+| COGNITO_DSP_CONSULTANT_GROUP  | The name of the Cognito user group for DSP consultants. |           |
+| COGNITO_USER_POOL_ID          | The ID of the Cognito user pool to manage.              |           |
+| ENVIRONMENT                   | The environment to log events against.                  | local     |
+| PROFILE_HOST                  | The host of TIS-Profile service.                        | localhost |
+| PROFILE_PORT                  | The port number of TIS-Profile service.                 | 8082      |
+| REQUEST_QUEUE_URL             | The URL of sync request queue.                          |           |
+| SENTRY_DSN                    | A Sentry error monitoring Data Source Name.             |           |
 
 #### Usage Examples
 

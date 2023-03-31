@@ -21,6 +21,7 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
+import com.amazonaws.xray.spring.aop.XRayEnabled;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,7 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 @Slf4j
 @RestController
 @RequestMapping("/api/user-groups")
+@XRayEnabled
 public class UserGroupsResource {
 
   private final UserAccountService service;
