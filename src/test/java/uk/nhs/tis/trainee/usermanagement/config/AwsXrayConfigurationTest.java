@@ -31,7 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-public class AwsXrayConfigurationTest {
+class AwsXrayConfigurationTest {
   private static final String DAEMON_PROPERTY = "com.amazonaws.xray.emitters.daemon-address";
 
   private ApplicationContextRunner runner;
