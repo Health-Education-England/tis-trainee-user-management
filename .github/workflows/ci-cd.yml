@@ -14,3 +14,4 @@ jobs:
       use-codeartifact: true
     secrets:
       sonar-token: ${{ secrets.SONAR_TOKEN }}
+      reject-pat: ${{ secrets.PAT_REJECT_APPROVALS }}
