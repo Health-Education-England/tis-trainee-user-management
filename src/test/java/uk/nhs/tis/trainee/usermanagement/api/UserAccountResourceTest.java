@@ -57,9 +57,9 @@ class UserAccountResourceTest {
   @Test
   void shouldGetUserAccountDetails() throws Exception {
     List<String> groups = List.of("GROUP_1", "GROUP_2");
-    Instant ACCOUNT_CREATED = Instant.now();
+    Instant accountCreated = Instant.now();
     UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
-        "USER_STATUS", groups, ACCOUNT_CREATED);
+        "USER_STATUS", groups, accountCreated);
 
     when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
 
@@ -72,7 +72,7 @@ class UserAccountResourceTest {
         .andExpect(jsonPath("$.groups.length()").value(2))
         .andExpect(jsonPath("$.groups[0]").value("GROUP_1"))
         .andExpect(jsonPath("$.groups[1]").value("GROUP_2"))
-        .andExpect(jsonPath("$.accountCreated").value(ACCOUNT_CREATED.toString()));
+        .andExpect(jsonPath("$.accountCreated").value(accountCreated.toString()));
   }
 
   @Test
