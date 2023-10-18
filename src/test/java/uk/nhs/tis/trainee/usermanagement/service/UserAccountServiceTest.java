@@ -25,6 +25,7 @@ import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -44,6 +45,8 @@ import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +82,7 @@ class UserAccountServiceTest {
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), is("NO_ACCOUNT"));
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(), is("NO_ACCOUNT"));
     assertThat("Unexpected user groups size.", userAccountDetails.getGroups().size(), is(0));
+    assertThat("Unexpected account created", userAccountDetails.getAccountCreated(), nullValue());
   }
 
   @Test
@@ -90,6 +94,33 @@ class UserAccountServiceTest {
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), not("NO_ACCOUNT"));
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(), not("NO_ACCOUNT"));
     assertThat("Unexpected user groups size.", userAccountDetails.getGroups().size(), is(0));
+    assertThat("Unexpected account created.", userAccountDetails.getAccountCreated(), nullValue());
+  }
+
+  @Test
+  void shouldSetNullCreatedAtWhenUserCreatedDateIsNull() {
+    AdminGetUserResult result = new AdminGetUserResult();
+    result.setUserCreateDate(null);
+
+    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
+
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    assertThat("Unexpected account created.", userAccountDetails.getAccountCreated(),
+        nullValue());
+  }
+
+  @Test
+  void shouldSetCreatedAtWhenUserCreatedDateNotNull() {
+    AdminGetUserResult result = new AdminGetUserResult();
+    Instant createdAt = Instant.now();
+    Instant createdAtWithDatePrecision = Date.from(createdAt).toInstant();
+    result.setUserCreateDate(Date.from(createdAt));
+
+    when(cognitoIdp.adminGetUser(any())).thenReturn(result);
+
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    assertThat("Unexpected account created.", userAccountDetails.getAccountCreated(),
+        is(createdAtWithDatePrecision));
   }
 
   @Test
@@ -115,6 +146,7 @@ class UserAccountServiceTest {
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(),
         is(UserStatusType.UNCONFIRMED.toString()));
   }
+
 
   @Test
   void shouldGetUserStatusWhenUserStatusForcedPasswordChange() {
