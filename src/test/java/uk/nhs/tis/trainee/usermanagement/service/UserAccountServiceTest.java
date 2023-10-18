@@ -25,6 +25,7 @@ import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -79,6 +80,7 @@ class UserAccountServiceTest {
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), is("NO_ACCOUNT"));
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(), is("NO_ACCOUNT"));
     assertThat("Unexpected user groups size.", userAccountDetails.getGroups().size(), is(0));
+    assertThat("Unexpected account created", userAccountDetails.getAccountCreated(), nullValue());
   }
 
   @Test
@@ -90,6 +92,7 @@ class UserAccountServiceTest {
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), not("NO_ACCOUNT"));
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(), not("NO_ACCOUNT"));
     assertThat("Unexpected user groups size.", userAccountDetails.getGroups().size(), is(0));
+    assertThat("Unexpected account created.", userAccountDetails.getAccountCreated(), nullValue());
   }
 
   @Test

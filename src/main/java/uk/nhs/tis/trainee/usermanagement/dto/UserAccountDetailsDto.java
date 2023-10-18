@@ -21,6 +21,9 @@
 
 package uk.nhs.tis.trainee.usermanagement.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonFormat.Shape;
+import java.time.Instant;
 import java.util.List;
 import lombok.Value;
 
@@ -30,4 +33,6 @@ public class UserAccountDetailsDto {
   String mfaStatus;
   String userStatus;
   List<String> groups;
+  @JsonFormat(shape = Shape.STRING)
+  Instant accountCreated;
 }

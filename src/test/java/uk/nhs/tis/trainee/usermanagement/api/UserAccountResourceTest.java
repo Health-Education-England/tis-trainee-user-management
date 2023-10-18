@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,8 +57,9 @@ class UserAccountResourceTest {
   @Test
   void shouldGetUserAccountDetails() throws Exception {
     List<String> groups = List.of("GROUP_1", "GROUP_2");
+    Instant ACCOUNT_CREATED = Instant.now();
     UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
-        "USER_STATUS", groups);
+        "USER_STATUS", groups, ACCOUNT_CREATED);
 
     when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
 
@@ -69,7 +71,8 @@ class UserAccountResourceTest {
         .andExpect(jsonPath("$.groups").isArray())
         .andExpect(jsonPath("$.groups.length()").value(2))
         .andExpect(jsonPath("$.groups[0]").value("GROUP_1"))
-        .andExpect(jsonPath("$.groups[1]").value("GROUP_2"));
+        .andExpect(jsonPath("$.groups[1]").value("GROUP_2"))
+        .andExpect(jsonPath("$.accountCreated").value(ACCOUNT_CREATED.toString()));
   }
 
   @Test

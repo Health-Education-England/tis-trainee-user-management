@@ -35,6 +35,7 @@ import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import java.time.Instant;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -77,11 +78,15 @@ public class UserAccountService {
       String preferredMfa = result.getPreferredMfaSetting();
 
       String mfaStatus = preferredMfa == null ? NO_MFA : preferredMfa;
+      Instant createdAt = null;
+      if (result.getUserCreateDate() != null) {
+        createdAt = result.getUserCreateDate().toInstant();
+      }
       userAccountDetails = new UserAccountDetailsDto(mfaStatus, result.getUserStatus(),
-          getUserGroups(username));
+          getUserGroups(username), createdAt);
     } catch (UserNotFoundException e) {
       log.info("User '{}' not found.", username);
-      userAccountDetails = new UserAccountDetailsDto(NO_ACCOUNT, NO_ACCOUNT, List.of());
+      userAccountDetails = new UserAccountDetailsDto(NO_ACCOUNT, NO_ACCOUNT, List.of(), null);
     }
 
     return userAccountDetails;
