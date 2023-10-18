@@ -34,24 +34,36 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
+@WebMvcTest(UserAccountResource.class)
 class UserAccountResourceTest {
 
   private static final String USERNAME = "username";
 
-  private MockMvc mockMvc;
+  @Autowired
+  private MappingJackson2HttpMessageConverter jacksonMessageConverter;
+
+  @MockBean
   private UserAccountService service;
+
+  private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     service = mock(UserAccountService.class);
     UserAccountResource resource = new UserAccountResource(service);
-    mockMvc = MockMvcBuilders.standaloneSetup(resource).build();
+    mockMvc = MockMvcBuilders.standaloneSetup(resource)
+        .setMessageConverters(jacksonMessageConverter)
+        .build();
   }
 
   @Test
