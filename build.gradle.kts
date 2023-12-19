@@ -1,11 +1,11 @@
 plugins {
-  id "java"
+  java
   id("org.springframework.boot") version "2.7.5"
   id("io.spring.dependency-management") version "1.1.4"
 
   // Code quality plugins
-  id "checkstyle"
-  id "jacoco"
+  checkstyle
+  jacoco
   id("org.sonarqube") version "4.4.1.3373"
 }
 
@@ -14,7 +14,7 @@ version = "1.2.1"
 
 configurations {
   compileOnly {
-    extendsFrom(annotationProcessor)
+    extendsFrom(configurations.annotationProcessor.get())
   }
 }
 
@@ -22,10 +22,10 @@ repositories {
   mavenCentral()
 
   maven {
-    url "https://hee-430723991443.d.codeartifact.eu-west-1.amazonaws.com/maven/Health-Education-England/"
+    url = uri("https://hee-430723991443.d.codeartifact.eu-west-1.amazonaws.com/maven/Health-Education-England/")
     credentials {
-      username "aws"
-      password System.env.CODEARTIFACT_AUTH_TOKEN
+      username = "aws"
+      password = System.getenv("CODEARTIFACT_AUTH_TOKEN")
     }
   }
 }
@@ -51,13 +51,13 @@ dependencies {
   annotationProcessor("org.projectlombok:lombok")
 
   // MapStruct
-  ext.mapstructVersion = "1.5.5.Final"
+  val mapstructVersion = "1.5.5.Final"
   implementation("org.mapstruct:mapstruct:${mapstructVersion}")
   annotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
   testAnnotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
 
   // Sentry reporting
-  ext.sentryVersion = "7.0.0"
+  val sentryVersion = "7.0.0"
   implementation("io.sentry:sentry-spring-boot-starter:$sentryVersion")
   implementation("io.sentry:sentry-logback:$sentryVersion")
 
@@ -68,7 +68,7 @@ dependencies {
 }
 
 checkstyle {
-  config = resources.text.fromArchiveEntry(configurations.checkstyle[0], "google_checks.xml")
+  config = resources.text.fromArchiveEntry(configurations.checkstyle.get().first(), "google_checks.xml")
 }
 
 java {
