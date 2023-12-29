@@ -28,19 +28,27 @@ import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsRequest;
+import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
+import com.amazonaws.services.cognitoidp.model.AuthEventType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 
 @Slf4j
 @Service
@@ -49,6 +57,7 @@ public class UserAccountService {
 
   private static final String NO_ACCOUNT = "NO_ACCOUNT";
   private static final String NO_MFA = "NO_MFA";
+  private static final Integer MAX_LOGIN_EVENTS = 10;
 
   private final AWSCognitoIdentityProvider cognitoIdp;
   private final String userPoolId;
@@ -90,6 +99,61 @@ public class UserAccountService {
     }
 
     return userAccountDetails;
+  }
+
+  /**
+   * Get the list of user login event details for the account associated with the given username.
+   *
+   * @param username The username for the account.
+   * @return The list of user login event details.
+   */
+  public List<UserLoginDetailsDto> getUserLoginDetails(String username) {
+    log.info("Retrieving login events for user with username '{}'.", username);
+    AdminListUserAuthEventsRequest request = new AdminListUserAuthEventsRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+    request.setMaxResults(MAX_LOGIN_EVENTS); //results are sorted in descending CreationDate order
+
+    List<UserLoginDetailsDto> userLoginDetailsList;
+
+    try {
+      AdminListUserAuthEventsResult result = cognitoIdp.adminListUserAuthEvents(request);
+      userLoginDetailsList = getLoginDetailsListFromAuthEvents(result);
+
+    } catch (UserNotFoundException e) {
+      log.info("User '{}' not found.", username);
+      return List.of();
+    }
+
+    return userLoginDetailsList;
+  }
+
+  /**
+   * Retrieve the list of UserLoginDetailsDtos from the user auth events list.
+   *
+   * @param authEventsResult the result of the auth events call.
+   * @return the list of UserLoginDetailsDtos, or an empty list if no auth events exist.
+   */
+  private List<UserLoginDetailsDto> getLoginDetailsListFromAuthEvents(
+      AdminListUserAuthEventsResult authEventsResult) {
+    List<UserLoginDetailsDto> userLoginDetailsList = new ArrayList<>();
+    List<AuthEventType> authEvents = authEventsResult.getAuthEvents();
+
+    authEvents.forEach(authEvent -> {
+      String eventId = authEvent.getEventId();
+      Date eventDate = authEvent.getCreationDate();
+      String event = authEvent.getEventType();
+      String eventResult = authEvent.getEventResponse();
+      String device = authEvent.getEventContextData().getDeviceName();
+      String challenges = StringUtils.join(authEvent.getChallengeResponses().stream()
+          .map(it -> it.getChallengeName()+ ":" + it.getChallengeResponse())
+          .toList(), ", ");
+
+      UserLoginDetailsDto eventDto
+          = new UserLoginDetailsDto(eventId, eventDate, event, eventResult, challenges, device);
+      userLoginDetailsList.add(eventDto);
+    });
+    return userLoginDetailsList;
   }
 
   /**
