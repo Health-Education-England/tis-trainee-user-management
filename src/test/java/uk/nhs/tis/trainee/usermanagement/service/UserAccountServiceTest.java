@@ -38,10 +38,14 @@ import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupResult;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
+import com.amazonaws.services.cognitoidp.model.AuthEventType;
+import com.amazonaws.services.cognitoidp.model.ChallengeResponseType;
+import com.amazonaws.services.cognitoidp.model.EventContextDataType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
@@ -52,6 +56,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 
 class UserAccountServiceTest {
 
@@ -301,5 +306,80 @@ class UserAccountServiceTest {
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
     assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
     assertThat("Unexpected user group.", request.getGroupName(), is(GROUP_1));
+  }
+
+  @Test
+  void shouldReturnNoLoginsWhenUserNotFoundGettingUserLogins() {
+    when(cognitoIdp.adminListUserAuthEvents(any())).thenThrow(UserNotFoundException.class);
+
+    List<UserLoginDetailsDto> userLoginDetails = service.getUserLoginDetails(USERNAME);
+    assertThat("Unexpected logins.", userLoginDetails.size(), is(0));
+  }
+
+  @Test
+  void shouldGetUserLoginsWhenUserFoundGettingUserLogins() {
+    Date eventDate = new Date();
+
+    AuthEventType authEventTypeOne = new AuthEventType();
+    authEventTypeOne.setCreationDate(eventDate);
+    authEventTypeOne.setEventId("EVENT_ID");
+    authEventTypeOne.setEventType("EVENT_TYPE");
+    authEventTypeOne.setEventResponse("RESPONSE");
+
+    ChallengeResponseType challenge1 = new ChallengeResponseType();
+    challenge1.setChallengeName("Password");
+    challenge1.setChallengeResponse("Success");
+    ChallengeResponseType challenge2 = new ChallengeResponseType();
+    challenge2.setChallengeName("Mfa");
+    challenge2.setChallengeResponse("Failure");
+    authEventTypeOne.setChallengeResponses(List.of(challenge1, challenge2));
+
+    EventContextDataType eventContextDataType = new EventContextDataType();
+    eventContextDataType.setDeviceName("DEVICE");
+    authEventTypeOne.setEventContextData(eventContextDataType);
+
+    Date eventDateTwo = new Date();
+
+    AuthEventType authEventTypeTwo = new AuthEventType();
+    authEventTypeTwo.setCreationDate(eventDateTwo);
+    authEventTypeTwo.setEventId("EVENT_ID_2");
+    authEventTypeTwo.setEventType("EVENT_TYPE_2");
+    authEventTypeTwo.setEventResponse("RESPONSE_2");
+
+    ChallengeResponseType challenge3 = new ChallengeResponseType();
+    challenge3.setChallengeName("Password");
+    challenge3.setChallengeResponse("Failure");
+    authEventTypeTwo.setChallengeResponses(List.of(challenge3));
+
+    EventContextDataType eventContextDataTypeTwo = new EventContextDataType();
+    eventContextDataTypeTwo.setDeviceName("DEVICE_2");
+    authEventTypeTwo.setEventContextData(eventContextDataTypeTwo);
+
+    AdminListUserAuthEventsResult result = new AdminListUserAuthEventsResult();
+    result.setAuthEvents(List.of(authEventTypeOne, authEventTypeTwo));
+
+    when(cognitoIdp.adminListUserAuthEvents(any())).thenReturn(result);
+
+    List<UserLoginDetailsDto> userLogins = service.getUserLoginDetails(USERNAME);
+
+    assertThat("Unexpected logins count.", userLogins.size(), is(2));
+
+    UserLoginDetailsDto loginOne = userLogins.get(0);
+    assertThat("Unexpected login id.", loginOne.getEventId(), is("EVENT_ID"));
+    assertThat("Unexpected login event.", loginOne.getEvent(), is("EVENT_TYPE"));
+    assertThat("Unexpected login date.", loginOne.getEventDate(), is(eventDate));
+    assertThat("Unexpected login result.", loginOne.getResult(), is("RESPONSE"));
+    assertThat("Unexpected login device.", loginOne.getDevice(), is("DEVICE"));
+    assertThat("Unexpected login challenge.", loginOne.getChallenges(),
+        is("Password:Success, Mfa:Failure"));
+
+    UserLoginDetailsDto loginTwo = userLogins.get(1);
+    assertThat("Unexpected login id.", loginTwo.getEventId(), is("EVENT_ID_2"));
+    assertThat("Unexpected login event.", loginTwo.getEvent(), is("EVENT_TYPE_2"));
+    assertThat("Unexpected login date.", loginTwo.getEventDate(), is(eventDateTwo));
+    assertThat("Unexpected login result.", loginTwo.getResult(), is("RESPONSE_2"));
+    assertThat("Unexpected login device.", loginTwo.getDevice(), is("DEVICE_2"));
+    assertThat("Unexpected login challenge.", loginTwo.getChallenges(),
+        is("Password:Failure"));
   }
 }

@@ -22,6 +22,7 @@
 package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
 /**
@@ -58,6 +60,18 @@ public class UserAccountResource {
   ResponseEntity<UserAccountDetailsDto> getUserAccountDetails(@PathVariable String username) {
     log.info("Account details requested for user '{}'.", username);
     return ResponseEntity.ok(service.getUserAccountDetails(username));
+  }
+
+  /**
+   * Get the list of login events for the account associated with the given username.
+   *
+   * @param username The username for the account.
+   * @return The list of login events.
+   */
+  @GetMapping("/logins/{username}")
+  ResponseEntity<List<UserLoginDetailsDto>> getUserLoginDetails(@PathVariable String username) {
+    log.info("Login details requested for user '{}'.", username);
+    return ResponseEntity.ok(service.getUserLoginDetails(username));
   }
 
   /**
