@@ -43,6 +43,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -145,9 +146,9 @@ public class UserAccountService {
       String event = authEvent.getEventType();
       String eventResult = authEvent.getEventResponse();
       String device = authEvent.getEventContextData().getDeviceName();
-      String challenges = StringUtils.join(authEvent.getChallengeResponses().stream()
-          .map(it -> it.getChallengeName()+ ":" + it.getChallengeResponse())
-          .toList(), ", ");
+      String challenges = authEvent.getChallengeResponses().stream()
+          .map(it -> it.getChallengeName() + ":" + it.getChallengeResponse())
+          .collect(Collectors.joining(", "));
 
       UserLoginDetailsDto eventDto
           = new UserLoginDetailsDto(eventId, eventDate, event, eventResult, challenges, device);
