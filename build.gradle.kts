@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "1.3.0"
+version = "1.4.0"
 
 configurations {
   compileOnly {
@@ -32,6 +32,7 @@ repositories {
 
 dependencyManagement {
   imports {
+    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2021.0.8")
     mavenBom("io.awspring.cloud:spring-cloud-aws-dependencies:2.4.4")
   }
 }
@@ -39,6 +40,7 @@ dependencyManagement {
 dependencies {
   // Spring Boot starters
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  implementation("org.springframework.boot:spring-boot-starter-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-security")
   testImplementation("org.springframework.boot:spring-boot-starter-test")
@@ -65,6 +67,10 @@ dependencies {
   implementation("com.amazonaws:aws-java-sdk-cognitoidp")
   implementation("io.awspring.cloud:spring-cloud-starter-aws-messaging")
   implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.15.1")
+
+  testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
+  testImplementation("com.playtika.testcontainers:embedded-redis:2.3.6")
+  testImplementation("org.testcontainers:junit-jupiter:1.19.7")
 }
 
 checkstyle {
