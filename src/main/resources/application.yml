@@ -13,13 +13,27 @@ application:
       user-pool-id: ${COGNITO_USER_POOL_ID}
       dsp-consultant-group: ${COGNITO_DSP_CONSULTANT_GROUP}
     sqs:
+      contact-details:
+        updated: ${CONTACT_DETAILS_UPDATED_QUEUE:}
       request: ${REQUEST_QUEUE_URL:}
   environment: ${ENVIRONMENT:local}
+  cache:
+    key-prefix: UserManagement
+    time-to-live: PT24H
 
 cloud:
   aws:
     region:
       static: ${AWS_REGION}
+
+spring:
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    ssl:
+      enabled: ${REDIS_SSL:false}
+    username: ${REDIS_USERNAME:default}
+    password: ${REDIS_PASSWORD:password}
 
 profile:
   server:

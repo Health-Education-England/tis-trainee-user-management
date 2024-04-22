@@ -32,22 +32,31 @@ import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsRequest;
 import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
+import com.amazonaws.services.cognitoidp.model.AdminUpdateUserAttributesRequest;
+import com.amazonaws.services.cognitoidp.model.AttributeType;
 import com.amazonaws.services.cognitoidp.model.AuthEventType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
+import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
+import com.amazonaws.services.cognitoidp.model.ListUsersResult;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
+import com.amazonaws.services.cognitoidp.model.UserType;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 
@@ -56,17 +65,22 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 @XRayEnabled
 public class UserAccountService {
 
+  private static final String USER_ID_CACHE = "UserId";
+
   private static final String NO_ACCOUNT = "NO_ACCOUNT";
   private static final String NO_MFA = "NO_MFA";
   private static final Integer MAX_LOGIN_EVENTS = 10;
 
   private final AWSCognitoIdentityProvider cognitoIdp;
   private final String userPoolId;
+  private final Cache cache;
 
   UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
-      @Value("${application.aws.cognito.user-pool-id}") String userPoolId) {
+      @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
+      CacheManager cacheManager) {
     this.cognitoIdp = cognitoIdp;
     this.userPoolId = userPoolId;
+    cache = cacheManager.getCache(USER_ID_CACHE);
   }
 
   /**
@@ -100,6 +114,44 @@ public class UserAccountService {
     }
 
     return userAccountDetails;
+  }
+
+  /**
+   * Update the email for the given account.
+   */
+  public void updateEmail(String accountId, String newEmail) {
+    log.info("Updating email to '{}' for account '{}'.", newEmail, accountId);
+
+    try {
+      // Verify that the new email is not already used.
+      AdminGetUserRequest request = new AdminGetUserRequest();
+      request.setUserPoolId(userPoolId);
+      request.setUsername(newEmail);
+      AdminGetUserResult result = cognitoIdp.adminGetUser(request);
+      String existingAccountId = result.getUsername();
+
+      if (existingAccountId.equals(accountId)) {
+        log.info("The email for this account has not changed, skipping update.");
+      } else {
+        String message = String.format("The email '%s' is already in use by account '%s'.",
+            newEmail, existingAccountId);
+        throw new IllegalArgumentException(message);
+      }
+    } catch (UserNotFoundException e) {
+      // If an existing user was not found then the new email address can be used.
+      AdminUpdateUserAttributesRequest request = new AdminUpdateUserAttributesRequest();
+      request.setUserPoolId(userPoolId);
+      request.setUsername(accountId);
+
+      request.setUserAttributes(List.of(
+          new AttributeType().withName("email").withValue(newEmail),
+          new AttributeType().withName("email_verified").withValue("true")
+      ));
+
+      cognitoIdp.adminUpdateUserAttributes(request);
+      log.info("Successfully updated email to '{}' for account '{}'.", newEmail,
+          accountId);
+    }
   }
 
   /**
@@ -244,5 +296,62 @@ public class UserAccountService {
 
     cognitoIdp.adminRemoveUserFromGroup(request);
     log.info("User '{}' has been withdrawn from the {} group.", username, groupName);
+  }
+
+
+  /**
+   * Get all user account IDs associated with the given person ID.
+   *
+   * @param personId The person ID to get the user IDs for.
+   * @return The found user IDs, or empty if not found.
+   */
+  @Cacheable(cacheNames = USER_ID_CACHE, unless = "#result.isEmpty()")
+  public Set<String> getUserAccountIds(String personId) {
+    log.info("User account not found in the cache.");
+    cacheAllUserAccountIds();
+
+    Set<String> userAccountIds = cache.get(personId, Set.class);
+    return userAccountIds != null ? userAccountIds : Set.of();
+  }
+
+  /**
+   * Retrieve and cache a mapping of all person IDs to user IDs.
+   */
+  private void cacheAllUserAccountIds() {
+    log.info("Caching all user account ids from Cognito.");
+    StopWatch cacheTimer = new StopWatch();
+    cacheTimer.start();
+
+    String paginationToken = null;
+
+    do {
+      ListUsersRequest request = new ListUsersRequest();
+      request.setUserPoolId(userPoolId);
+      request.setPaginationToken(paginationToken);
+
+      ListUsersResult result = cognitoIdp.listUsers(request);
+      result.getUsers().stream()
+          .map(UserType::getAttributes)
+          .map(attributes -> attributes.stream()
+              .collect(Collectors.toMap(AttributeType::getName, AttributeType::getValue))
+          )
+          .forEach(attr -> {
+            String tisId = attr.get("custom:tisId");
+            Set<String> ids = cache.get(tisId, Set.class);
+
+            if (ids == null) {
+              ids = new HashSet<>();
+            }
+
+            ids.add(attr.get("sub"));
+            cache.put(tisId, ids);
+          });
+
+      paginationToken = result.getPaginationToken();
+    } while (paginationToken != null);
+
+    cacheTimer.stop();
+    log.info("Total time taken to cache all user accounts was: {}s",
+        cacheTimer.getTotalTimeSeconds());
   }
 }
