@@ -31,6 +31,9 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheManager.RedisCacheManagerBuilder;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 
 /**
  * Configuration for caching behaviour.
@@ -52,6 +55,20 @@ public class CacheConfiguration {
       @Value("${application.cache.time-to-live}") Duration ttl) {
     this.prefix = prefix;
     this.ttl = ttl;
+  }
+
+  /**
+   * Configuration for the general data accessor.
+   *
+   * @return a RedisTemplate
+   */
+  @Bean
+  public RedisTemplate<String, String> redisTemplate(
+      LettuceConnectionFactory lettuceConnectionFactory) {
+    RedisTemplate<String, String> redisTemplate = new RedisTemplate<>();
+    redisTemplate.setKeySerializer(new GenericJackson2JsonRedisSerializer());
+    redisTemplate.setConnectionFactory(lettuceConnectionFactory);
+    return redisTemplate;
   }
 
   /**
