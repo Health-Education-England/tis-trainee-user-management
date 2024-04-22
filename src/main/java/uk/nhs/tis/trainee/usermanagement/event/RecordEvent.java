@@ -21,7 +21,6 @@
 
 package uk.nhs.tis.trainee.usermanagement.event;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +31,6 @@ import lombok.Getter;
  * An abstract representation of a record event.
  */
 @Getter
-@JsonIgnoreProperties(ignoreUnknown = true)
 public abstract class RecordEvent {
 
   private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
