@@ -340,7 +340,8 @@ public class UserAccountService {
           log.warn("Cognito requests have exceed the limit.", tmre);
           Thread.sleep(200);
         } catch (InterruptedException ie) {
-          log.warn("Unabled to sleep thread.", ie);
+          log.warn("Unable to sleep thread.", ie);
+          Thread.currentThread().interrupt();
         }
       }
     } while (paginationToken != null);
