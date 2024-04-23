@@ -40,6 +40,7 @@ import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
+import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserType;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
@@ -329,29 +330,49 @@ public class UserAccountService {
       request.setUserPoolId(userPoolId);
       request.setPaginationToken(paginationToken);
 
-      ListUsersResult result = cognitoIdp.listUsers(request);
-      result.getUsers().stream()
-          .map(UserType::getAttributes)
-          .map(attributes -> attributes.stream()
-              .collect(Collectors.toMap(AttributeType::getName, AttributeType::getValue))
-          )
-          .forEach(attr -> {
-            String tisId = attr.get("custom:tisId");
-            Set<String> ids = cache.get(tisId, Set.class);
-
-            if (ids == null) {
-              ids = new HashSet<>();
-            }
-
-            ids.add(attr.get("sub"));
-            cache.put(tisId, ids);
-          });
-
-      paginationToken = result.getPaginationToken();
+      try {
+        ListUsersResult result = cognitoIdp.listUsers(request);
+        cacheUserAccountIds(result);
+        paginationToken = result.getPaginationToken();
+      } catch (TooManyRequestsException tmre) {
+        try {
+          // Cognito requests are limited to 5 per second.
+          log.warn("Cognito requests have exceed the limit.", tmre);
+          Thread.sleep(200);
+        } catch (InterruptedException ie) {
+          log.warn("Unable to sleep thread.", ie);
+          Thread.currentThread().interrupt();
+        }
+      }
     } while (paginationToken != null);
 
     cacheTimer.stop();
     log.info("Total time taken to cache all user accounts was: {}s",
         cacheTimer.getTotalTimeSeconds());
+  }
+
+  /**
+   * Cache the user accounts ids for the given result.
+   *
+   * @param result The result of a ListUsersRequest.
+   */
+  private void cacheUserAccountIds(ListUsersResult result) {
+
+    result.getUsers().stream()
+        .map(UserType::getAttributes)
+        .map(attributes -> attributes.stream()
+            .collect(Collectors.toMap(AttributeType::getName, AttributeType::getValue))
+        )
+        .forEach(attr -> {
+          String tisId = attr.get("custom:tisId");
+          Set<String> ids = cache.get(tisId, Set.class);
+
+          if (ids == null) {
+            ids = new HashSet<>();
+          }
+
+          ids.add(attr.get("sub"));
+          cache.put(tisId, ids);
+        });
   }
 }
