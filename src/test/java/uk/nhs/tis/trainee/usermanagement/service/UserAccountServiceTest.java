@@ -54,6 +54,7 @@ import com.amazonaws.services.cognitoidp.model.EventContextDataType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
+import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import com.amazonaws.services.cognitoidp.model.UserType;
@@ -538,6 +539,45 @@ class UserAccountServiceTest {
     assertThat("Unexpected pagination token.", request1.getPaginationToken(), nullValue());
     ListUsersRequest request2 = requests.get(1);
     assertThat("Unexpected pagination token.", request2.getPaginationToken(), is("tokenforpage2"));
+  }
+
+  @Test
+  void shouldRetryPaginatingThroughAllUserAccountIdsWhenRateLimitedGettingUserAccountIds() {
+    ListUsersResult result1 = new ListUsersResult();
+    result1.setUsers(List.of(new UserType().withAttributes(
+        new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1),
+        new AttributeType().withName(ATTRIBUTE_USER_ID).withValue(USER_ID_1)
+    )));
+    result1.setPaginationToken("tokenforpage2");
+
+    ListUsersResult result2 = new ListUsersResult();
+    result2.setUsers(List.of(new UserType().withAttributes(
+        new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_2),
+        new AttributeType().withName(ATTRIBUTE_USER_ID).withValue(USER_ID_2)
+    )));
+
+    ArgumentCaptor<ListUsersRequest> requestCaptor = ArgumentCaptor.forClass(
+        ListUsersRequest.class);
+    when(cognitoIdp.listUsers(requestCaptor.capture()))
+        .thenReturn(result1)
+        .thenThrow(TooManyRequestsException.class)
+        .thenReturn(result2);
+
+    when(cache.get(any())).thenReturn(null);
+
+    service.getUserAccountIds(TRAINEE_ID_1);
+
+    verify(cache).put(TRAINEE_ID_1, Set.of(USER_ID_1));
+    verify(cache).put(TRAINEE_ID_2, Set.of(USER_ID_2));
+
+    List<ListUsersRequest> requests = requestCaptor.getAllValues();
+    assertThat("Unexpected request count.", requests.size(), is(3));
+    ListUsersRequest request1 = requests.get(0);
+    assertThat("Unexpected pagination token.", request1.getPaginationToken(), nullValue());
+    ListUsersRequest request2 = requests.get(1);
+    assertThat("Unexpected pagination token.", request2.getPaginationToken(), is("tokenforpage2"));
+    ListUsersRequest request3 = requests.get(2);
+    assertThat("Unexpected pagination token.", request3.getPaginationToken(), is("tokenforpage2"));
   }
 
   @Test
