@@ -33,6 +33,7 @@ import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.model.AttributeType;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
 import com.amazonaws.services.cognitoidp.model.UserType;
+import io.awspring.cloud.messaging.listener.SimpleMessageListenerContainer;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +46,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -52,6 +55,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles({"redis", "test"})
 @Testcontainers(disabledWithoutDocker = true)
 @ExtendWith(MockitoExtension.class)
+@DirtiesContext(classMode = ClassMode.AFTER_EACH_TEST_METHOD)
 class UserAccountServiceIntegrationTest {
 
   private static final String TRAINEE_ID = "40";
@@ -62,6 +66,9 @@ class UserAccountServiceIntegrationTest {
 
   @MockBean
   private AWSCognitoIdentityProvider cognitoIdp;
+
+  @MockBean
+  private SimpleMessageListenerContainer listenerContainer;
 
   @Autowired
   UserAccountService service;

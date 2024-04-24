@@ -44,6 +44,8 @@ import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserType;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import io.awspring.cloud.messaging.listener.SimpleMessageListenerContainer;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
@@ -76,12 +78,20 @@ public class UserAccountService {
   private final String userPoolId;
   private final Cache cache;
 
+  private final SimpleMessageListenerContainer listenerContainer;
+  private final String contactDetailsQueue;
+
+  private Instant lastUserCaching = null;
+
   UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
-      CacheManager cacheManager) {
+      CacheManager cacheManager, SimpleMessageListenerContainer listenerContainer,
+      @Value("${application.aws.sqs.contact-details.updated}") String contactDetailsQueue) {
     this.cognitoIdp = cognitoIdp;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
+    this.listenerContainer = listenerContainer;
+    this.contactDetailsQueue = contactDetailsQueue;
   }
 
   /**
@@ -309,7 +319,13 @@ public class UserAccountService {
   @Cacheable(cacheNames = USER_ID_CACHE, unless = "#result.isEmpty()")
   public Set<String> getUserAccountIds(String personId) {
     log.info("User account not found in the cache.");
-    cacheAllUserAccountIds();
+
+    // Skip caching if we already cached in the last fifteen minutes.
+    if (lastUserCaching == null || lastUserCaching.plus(Duration.ofMinutes(15))
+        .isBefore(Instant.now())) {
+      cacheAllUserAccountIds();
+      lastUserCaching = Instant.now();
+    }
 
     Set<String> userAccountIds = cache.get(personId, Set.class);
     return userAccountIds != null ? userAccountIds : Set.of();
@@ -319,7 +335,9 @@ public class UserAccountService {
    * Retrieve and cache a mapping of all person IDs to user IDs.
    */
   private void cacheAllUserAccountIds() {
-    log.info("Caching all user account ids from Cognito.");
+    log.info("Caching all user account ids from Cognito, pausing queue listener.");
+    listenerContainer.stop(contactDetailsQueue);
+
     StopWatch cacheTimer = new StopWatch();
     cacheTimer.start();
 
@@ -349,6 +367,9 @@ public class UserAccountService {
     cacheTimer.stop();
     log.info("Total time taken to cache all user accounts was: {}s",
         cacheTimer.getTotalTimeSeconds());
+
+    listenerContainer.start(contactDetailsQueue);
+    log.info("The queue listener has been re-started.");
   }
 
   /**
@@ -357,7 +378,6 @@ public class UserAccountService {
    * @param result The result of a ListUsersRequest.
    */
   private void cacheUserAccountIds(ListUsersResult result) {
-
     result.getUsers().stream()
         .map(UserType::getAttributes)
         .map(attributes -> attributes.stream()
