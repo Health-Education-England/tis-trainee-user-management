@@ -59,7 +59,6 @@ import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import com.amazonaws.services.cognitoidp.model.UserType;
-import io.awspring.cloud.messaging.listener.SimpleMessageListenerContainer;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashSet;
@@ -69,8 +68,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
-import org.mockito.Mockito;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
@@ -90,12 +87,10 @@ class UserAccountServiceTest {
 
   private static final String ATTRIBUTE_TRAINEE_ID = "custom:tisId";
   private static final String ATTRIBUTE_USER_ID = "sub";
-  private static final String CONTACT_DETAILS_QUEUE = "queue/contact-details";
 
   private UserAccountService service;
   private AWSCognitoIdentityProvider cognitoIdp;
   private Cache cache;
-  private SimpleMessageListenerContainer listenerContainer;
 
   @BeforeEach
   void setUp() {
@@ -105,9 +100,7 @@ class UserAccountServiceTest {
     CacheManager cacheManager = mock(CacheManager.class);
     when(cacheManager.getCache("UserId")).thenReturn(cache);
 
-    listenerContainer = mock(SimpleMessageListenerContainer.class);
-    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager, listenerContainer,
-        CONTACT_DETAILS_QUEUE);
+    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager);
 
     // Initialize groups as an empty list instead of null, which reflects default AWS API behaviour.
     AdminListGroupsForUserResult mockGroupResult = new AdminListGroupsForUserResult();
@@ -647,19 +640,5 @@ class UserAccountServiceTest {
     service.getUserAccountIds(TRAINEE_ID_2);
 
     verify(cognitoIdp, times(1)).listUsers(any());
-  }
-
-  @Test
-  void shouldPauseContactDetailsQueueWhenBuildingUserIdCache() {
-    ListUsersResult result = new ListUsersResult();
-    result.setUsers(List.of());
-
-    when(cognitoIdp.listUsers(any())).thenReturn(result);
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-
-    InOrder inOrder = Mockito.inOrder(listenerContainer);
-    inOrder.verify(listenerContainer).stop(CONTACT_DETAILS_QUEUE);
-    inOrder.verify(listenerContainer).start(CONTACT_DETAILS_QUEUE);
   }
 }
