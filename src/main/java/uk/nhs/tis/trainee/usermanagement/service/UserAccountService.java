@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -77,14 +78,17 @@ public class UserAccountService {
   private final String userPoolId;
   private final Cache cache;
 
+  private final EventPublishService eventPublishService;
+
   private Instant lastUserCaching = null;
 
   UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
-      CacheManager cacheManager) {
+      CacheManager cacheManager, EventPublishService eventPublishService) {
     this.cognitoIdp = cognitoIdp;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
+    this.eventPublishService = eventPublishService;
   }
 
   /**
@@ -121,10 +125,13 @@ public class UserAccountService {
   }
 
   /**
-   * Update the email for the given account.
+   * Update the email for the given user account.
+   *
+   * @param userId   The ID of the user account.
+   * @param newEmail The new email to be used.
    */
-  public void updateEmail(String accountId, String newEmail) {
-    log.info("Updating email to '{}' for account '{}'.", newEmail, accountId);
+  public void updateEmail(String userId, String newEmail) {
+    log.info("Updating email to '{}' for user '{}'.", newEmail, userId);
 
     try {
       // Verify that the new email is not already used.
@@ -132,29 +139,38 @@ public class UserAccountService {
       request.setUserPoolId(userPoolId);
       request.setUsername(newEmail);
       AdminGetUserResult result = cognitoIdp.adminGetUser(request);
-      String existingAccountId = result.getUsername();
+      String existingUserId = result.getUsername();
 
-      if (existingAccountId.equals(accountId)) {
-        log.info("The email for this account has not changed, skipping update.");
+      if (existingUserId.equals(userId)) {
+        log.info("The email for this user has not changed, skipping update.");
       } else {
-        String message = String.format("The email '%s' is already in use by account '%s'.",
-            newEmail, existingAccountId);
+        String message = String.format("The email '%s' is already in use by user '%s'.", newEmail,
+            existingUserId);
         throw new IllegalArgumentException(message);
       }
     } catch (UserNotFoundException e) {
       // If an existing user was not found then the new email address can be used.
-      AdminUpdateUserAttributesRequest request = new AdminUpdateUserAttributesRequest();
-      request.setUserPoolId(userPoolId);
-      request.setUsername(accountId);
+      AdminGetUserRequest getRequest = new AdminGetUserRequest();
+      getRequest.setUserPoolId(userPoolId);
+      getRequest.setUsername(userId);
+      AdminGetUserResult existingDetails = cognitoIdp.adminGetUser(getRequest);
+      final Optional<String> existingEmail = existingDetails.getUserAttributes().stream()
+          .filter(ua -> ua.getName().equals("email"))
+          .map(AttributeType::getValue)
+          .findFirst();
 
-      request.setUserAttributes(List.of(
+      AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest();
+      updateRequest.setUserPoolId(userPoolId);
+      updateRequest.setUsername(userId);
+
+      updateRequest.setUserAttributes(List.of(
           new AttributeType().withName("email").withValue(newEmail),
           new AttributeType().withName("email_verified").withValue("true")
       ));
 
-      cognitoIdp.adminUpdateUserAttributes(request);
-      log.info("Successfully updated email to '{}' for account '{}'.", newEmail,
-          accountId);
+      cognitoIdp.adminUpdateUserAttributes(updateRequest);
+      eventPublishService.publishEmailUpdateEvent(userId, existingEmail.orElse(null), newEmail);
+      log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
     }
   }
 

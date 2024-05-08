@@ -68,6 +68,9 @@ class UserAccountServiceIntegrationTest {
   private AWSCognitoIdentityProvider cognitoIdp;
 
   @MockBean
+  private EventPublishService eventPublishService;
+
+  @MockBean
   private SimpleMessageListenerContainer listenerContainer;
 
   @Autowired

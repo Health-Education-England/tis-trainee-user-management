@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright 2022 Crown Copyright (Health Education England)
+ * Copyright 2024 Crown Copyright (Health Education England)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -19,23 +19,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.event;
 
-import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ActiveProfiles;
+/**
+ * An event to be published when an account email is updated.
+ *
+ * @param userId        The ID of the user account.
+ * @param previousEmail The previous email used as the username.
+ * @param newEmail      The new email used as the username.
+ */
+public record EmailUpdateEvent(String userId, String previousEmail, String newEmail) {
 
-@SpringBootTest
-@ActiveProfiles("test")
-class TisTraineeUserManagementApplicationTest {
-
-  @MockBean
-  private NotificationMessagingTemplate template;
-
-  @Test
-  void contextLoads() {
-
-  }
 }

@@ -12,6 +12,9 @@ application:
     cognito:
       user-pool-id: ${COGNITO_USER_POOL_ID}
       dsp-consultant-group: ${COGNITO_DSP_CONSULTANT_GROUP}
+    sns:
+      user-account:
+        update: ${USER_ACCOUNT_UPDATE_EVENT_TOPIC:}
     sqs:
       contact-details:
         updated: ${CONTACT_DETAILS_UPDATED_QUEUE:}
