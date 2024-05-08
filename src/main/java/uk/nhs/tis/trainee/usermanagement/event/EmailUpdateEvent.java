@@ -25,9 +25,11 @@ package uk.nhs.tis.trainee.usermanagement.event;
  * An event to be published when an account email is updated.
  *
  * @param userId        The ID of the user account.
+ * @param traineeId     The ID of the trainee.
  * @param previousEmail The previous email used as the username.
  * @param newEmail      The new email used as the username.
  */
-public record EmailUpdateEvent(String userId, String previousEmail, String newEmail) {
+public record EmailUpdateEvent(String userId, String traineeId, String previousEmail,
+                               String newEmail) {
 
 }

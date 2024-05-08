@@ -75,7 +75,7 @@ class EventPublishServiceTest {
     String previousEmail = "previous.email@example.com";
     String newEmail = "new.email@example.com";
 
-    eventPublishService.publishEmailUpdateEvent(USER_ID, previousEmail, newEmail);
+    eventPublishService.publishEmailUpdateEvent(USER_ID, TRAINEE_ID, previousEmail, newEmail);
 
     ArgumentCaptor<EmailUpdateEvent> eventCaptor = ArgumentCaptor.forClass(EmailUpdateEvent.class);
     ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.forClass(Map.class);
@@ -84,6 +84,7 @@ class EventPublishServiceTest {
 
     EmailUpdateEvent event = eventCaptor.getValue();
     assertThat("Unexpected user ID.", event.userId(), is(USER_ID));
+    assertThat("Unexpected trainee ID.", event.traineeId(), is(TRAINEE_ID));
     assertThat("Unexpected previous email.", event.previousEmail(), is(previousEmail));
     assertThat("Unexpected new email.", event.newEmail(), is(newEmail));
 

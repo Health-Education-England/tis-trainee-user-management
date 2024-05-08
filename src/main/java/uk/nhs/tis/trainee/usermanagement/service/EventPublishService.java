@@ -73,13 +73,15 @@ public class EventPublishService {
    * Public an event containing details of a user account email changing.
    *
    * @param userId        The ID of the user account.
+   * @param traineeId     The ID of the trainee.
    * @param previousEmail The original email associated with the account.
    * @param newEmail      The new email associated with the account.
    */
-  public void publishEmailUpdateEvent(String userId, String previousEmail, String newEmail) {
+  public void publishEmailUpdateEvent(String userId, String traineeId, String previousEmail,
+      String newEmail) {
     log.info("Publishing email update event for previous email '{}' and new email '{}'.",
         previousEmail, newEmail);
-    EmailUpdateEvent event = new EmailUpdateEvent(userId, previousEmail, newEmail);
+    EmailUpdateEvent event = new EmailUpdateEvent(userId, traineeId, previousEmail, newEmail);
     notificationMessagingTemplate.convertAndSend(userAccountUpdateTopicArn, event, Map.of(
         NOTIFICATION_SUBJECT_HEADER, "Account Email Updated",
         MESSAGE_GROUP_ID_HEADER, userId,

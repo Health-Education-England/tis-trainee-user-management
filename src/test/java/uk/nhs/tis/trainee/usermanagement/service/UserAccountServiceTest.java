@@ -88,6 +88,8 @@ class UserAccountServiceTest {
 
   private static final String ATTRIBUTE_TRAINEE_ID = "custom:tisId";
   private static final String ATTRIBUTE_USER_ID = "sub";
+  private static final String ATTRIBUTE_EMAIL = "email";
+  private static final String ATTRIBUTE_EMAIL_VERIFIED = "email_verified";
 
   private UserAccountService service;
   private AWSCognitoIdentityProvider cognitoIdp;
@@ -325,11 +327,11 @@ class UserAccountServiceTest {
     assertThat("Unexpected attribute count.", userAttributes.size(), is(2));
 
     AttributeType userAttribute = userAttributes.get(0);
-    assertThat("Unexpected attribute name.", userAttribute.getName(), is("email"));
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_EMAIL));
     assertThat("Unexpected attribute value.", userAttribute.getValue(), is(newEmail));
 
     userAttribute = userAttributes.get(1);
-    assertThat("Unexpected attribute name.", userAttribute.getName(), is("email_verified"));
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_EMAIL_VERIFIED));
     assertThat("Unexpected attribute value.", userAttribute.getValue(), is("true"));
   }
 
@@ -343,9 +345,9 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminGetUser(getRequestCaptor.capture()))
         .thenThrow(UserNotFoundException.class)
         .thenReturn(new AdminGetUserResult()
-            .withUserAttributes(new AttributeType()
-                .withName("email")
-                .withValue(previousEmail)
+            .withUserAttributes(
+                new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(previousEmail),
+                new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
             )
         );
 
@@ -357,7 +359,8 @@ class UserAccountServiceTest {
     AdminGetUserRequest getRequest = getRequests.get(1);
     assertThat("Unexpected username.", getRequest.getUsername(), is(USER_ID_1));
 
-    verify(eventPublishService).publishEmailUpdateEvent(USER_ID_1, previousEmail, newEmail);
+    verify(eventPublishService).publishEmailUpdateEvent(USER_ID_1, TRAINEE_ID_1, previousEmail,
+        newEmail);
   }
 
   @Test

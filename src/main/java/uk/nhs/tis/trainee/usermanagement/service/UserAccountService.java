@@ -158,6 +158,10 @@ public class UserAccountService {
           .filter(ua -> ua.getName().equals("email"))
           .map(AttributeType::getValue)
           .findFirst();
+      final Optional<String> traineeId = existingDetails.getUserAttributes().stream()
+          .filter(ua -> ua.getName().equals("custom:tisId"))
+          .map(AttributeType::getValue)
+          .findFirst();
 
       AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest();
       updateRequest.setUserPoolId(userPoolId);
@@ -169,7 +173,8 @@ public class UserAccountService {
       ));
 
       cognitoIdp.adminUpdateUserAttributes(updateRequest);
-      eventPublishService.publishEmailUpdateEvent(userId, existingEmail.orElse(null), newEmail);
+      eventPublishService.publishEmailUpdateEvent(userId, traineeId.orElse(null),
+          existingEmail.orElse(null), newEmail);
       log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
     }
   }
