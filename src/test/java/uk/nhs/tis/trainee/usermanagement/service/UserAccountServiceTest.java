@@ -40,6 +40,7 @@ import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupResult;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
@@ -87,10 +88,13 @@ class UserAccountServiceTest {
 
   private static final String ATTRIBUTE_TRAINEE_ID = "custom:tisId";
   private static final String ATTRIBUTE_USER_ID = "sub";
+  private static final String ATTRIBUTE_EMAIL = "email";
+  private static final String ATTRIBUTE_EMAIL_VERIFIED = "email_verified";
 
   private UserAccountService service;
   private AWSCognitoIdentityProvider cognitoIdp;
   private Cache cache;
+  private EventPublishService eventPublishService;
 
   @BeforeEach
   void setUp() {
@@ -100,7 +104,9 @@ class UserAccountServiceTest {
     CacheManager cacheManager = mock(CacheManager.class);
     when(cacheManager.getCache("UserId")).thenReturn(cache);
 
-    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager);
+    eventPublishService = mock(EventPublishService.class);
+
+    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager, eventPublishService);
 
     // Initialize groups as an empty list instead of null, which reflects default AWS API behaviour.
     AdminListGroupsForUserResult mockGroupResult = new AdminListGroupsForUserResult();
@@ -289,29 +295,72 @@ class UserAccountServiceTest {
   void shouldUpdateEmailWhenNewEmailNotExistsInUserPool() {
     String newEmail = "new.email@example.com";
 
-    when(cognitoIdp.adminGetUser(any())).thenThrow(UserNotFoundException.class);
+    ArgumentCaptor<AdminGetUserRequest> getRequestCaptor = ArgumentCaptor.forClass(
+        AdminGetUserRequest.class);
+    when(cognitoIdp.adminGetUser(getRequestCaptor.capture()))
+        .thenThrow(UserNotFoundException.class)
+        .thenReturn(new AdminGetUserResult()
+            .withUserAttributes(new AttributeType()
+                .withName("name")
+                .withValue("value")
+            )
+        );
 
     service.updateEmail(USER_ID_1, newEmail);
 
-    ArgumentCaptor<AdminUpdateUserAttributesRequest> requestCaptor = ArgumentCaptor.forClass(
+    List<AdminGetUserRequest> getRequests = getRequestCaptor.getAllValues();
+    assertThat("Unexpected get request count.", getRequests.size(), is(2));
+
+    AdminGetUserRequest getRequest = getRequests.get(0);
+    assertThat("Unexpected username.", getRequest.getUsername(), is(newEmail));
+
+    ArgumentCaptor<AdminUpdateUserAttributesRequest> updateRequestCaptor = ArgumentCaptor.forClass(
         AdminUpdateUserAttributesRequest.class);
-    verify(cognitoIdp).adminUpdateUserAttributes(requestCaptor.capture());
+    verify(cognitoIdp).adminUpdateUserAttributes(updateRequestCaptor.capture());
 
-    AdminUpdateUserAttributesRequest request = requestCaptor.getValue();
+    AdminUpdateUserAttributesRequest updateRequest = updateRequestCaptor.getValue();
 
-    assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected user ID.", request.getUsername(), is(USER_ID_1));
+    assertThat("Unexpected user pool.", updateRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected user ID.", updateRequest.getUsername(), is(USER_ID_1));
 
-    List<AttributeType> userAttributes = request.getUserAttributes();
+    List<AttributeType> userAttributes = updateRequest.getUserAttributes();
     assertThat("Unexpected attribute count.", userAttributes.size(), is(2));
 
     AttributeType userAttribute = userAttributes.get(0);
-    assertThat("Unexpected attribute name.", userAttribute.getName(), is("email"));
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_EMAIL));
     assertThat("Unexpected attribute value.", userAttribute.getValue(), is(newEmail));
 
     userAttribute = userAttributes.get(1);
-    assertThat("Unexpected attribute name.", userAttribute.getName(), is("email_verified"));
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_EMAIL_VERIFIED));
     assertThat("Unexpected attribute value.", userAttribute.getValue(), is("true"));
+  }
+
+  @Test
+  void shouldPublishEventAfterUpdatingEmail() {
+    String previousEmail = "previous.email@example.com";
+    String newEmail = "new.email@example.com";
+
+    ArgumentCaptor<AdminGetUserRequest> getRequestCaptor = ArgumentCaptor.forClass(
+        AdminGetUserRequest.class);
+    when(cognitoIdp.adminGetUser(getRequestCaptor.capture()))
+        .thenThrow(UserNotFoundException.class)
+        .thenReturn(new AdminGetUserResult()
+            .withUserAttributes(
+                new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(previousEmail),
+                new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+            )
+        );
+
+    service.updateEmail(USER_ID_1, newEmail);
+
+    List<AdminGetUserRequest> getRequests = getRequestCaptor.getAllValues();
+    assertThat("Unexpected get request count.", getRequests.size(), is(2));
+
+    AdminGetUserRequest getRequest = getRequests.get(1);
+    assertThat("Unexpected username.", getRequest.getUsername(), is(USER_ID_1));
+
+    verify(eventPublishService).publishEmailUpdateEvent(USER_ID_1, TRAINEE_ID_1, previousEmail,
+        newEmail);
   }
 
   @Test

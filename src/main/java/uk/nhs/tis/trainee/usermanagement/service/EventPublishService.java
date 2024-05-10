@@ -21,12 +21,18 @@
 
 package uk.nhs.tis.trainee.usermanagement.service;
 
+import static io.awspring.cloud.messaging.core.TopicMessageChannel.MESSAGE_GROUP_ID_HEADER;
+import static io.awspring.cloud.messaging.core.TopicMessageChannel.NOTIFICATION_SUBJECT_HEADER;
+
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
 import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
+import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
 
 /**
  * A service to publish events to SQS.
@@ -36,13 +42,19 @@ import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 @XRayEnabled
 public class EventPublishService {
 
-  private final QueueMessagingTemplate messagingTemplate;
+  private final NotificationMessagingTemplate notificationMessagingTemplate;
+  private final QueueMessagingTemplate queueMessagingTemplate;
+  private final String userAccountUpdateTopicArn;
   private final String queueUrl;
 
-  EventPublishService(QueueMessagingTemplate messagingTemplate,
-      @Value("${application.aws.sqs.request}") String queueUrl) {
-    this.messagingTemplate = messagingTemplate;
-    this.queueUrl = queueUrl;
+  EventPublishService(NotificationMessagingTemplate notificationMessagingTemplate,
+      @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
+      QueueMessagingTemplate queueMessagingTemplate,
+      @Value("${application.aws.sqs.request}") String requestQueueUrl) {
+    this.notificationMessagingTemplate = notificationMessagingTemplate;
+    this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
+    this.queueMessagingTemplate = queueMessagingTemplate;
+    this.queueUrl = requestQueueUrl;
   }
 
   /**
@@ -54,6 +66,26 @@ public class EventPublishService {
     log.info("Sending single profile sync event for trainee id '{}'", traineeTisId);
 
     DataRequestEvent dataRequestEvent = new DataRequestEvent("Person", traineeTisId);
-    messagingTemplate.convertAndSend(queueUrl, dataRequestEvent);
+    queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent);
+  }
+
+  /**
+   * Public an event containing details of a user account email changing.
+   *
+   * @param userId        The ID of the user account.
+   * @param traineeId     The ID of the trainee.
+   * @param previousEmail The original email associated with the account.
+   * @param newEmail      The new email associated with the account.
+   */
+  public void publishEmailUpdateEvent(String userId, String traineeId, String previousEmail,
+      String newEmail) {
+    log.info("Publishing email update event for previous email '{}' and new email '{}'.",
+        previousEmail, newEmail);
+    EmailUpdateEvent event = new EmailUpdateEvent(userId, traineeId, previousEmail, newEmail);
+    notificationMessagingTemplate.convertAndSend(userAccountUpdateTopicArn, event, Map.of(
+        NOTIFICATION_SUBJECT_HEADER, "Account Email Updated",
+        MESSAGE_GROUP_ID_HEADER, userId,
+        "producer", "tis-trainee-user-management"
+    ));
   }
 }
