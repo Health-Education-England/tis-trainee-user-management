@@ -32,12 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
@@ -74,6 +70,34 @@ class UserAccountResourceTest {
     mockMvc = MockMvcBuilders.standaloneSetup(resource)
         .setMessageConverters(jacksonMessageConverter)
         .build();
+  }
+
+  @Test
+  void shouldReturnExistenceFalseWhenUserAccountNotExists() throws Exception {
+    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("NO_ACCOUNT", "NO_ACCOUNT",
+        List.of(), null);
+
+    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
+
+    mockMvc.perform(get("/api/user-account/exists/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").isBoolean())
+        .andExpect(jsonPath("$.exists").value(false));
+  }
+
+  @Test
+  void shouldReturnExistenceTrueWhenUserAccountExists() throws Exception {
+    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
+        "USER_STATUS", List.of(), Instant.now());
+
+    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
+
+    mockMvc.perform(get("/api/user-account/exists/{username}", USERNAME)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").isBoolean())
+        .andExpect(jsonPath("$.exists").value(true));
   }
 
   @Test
