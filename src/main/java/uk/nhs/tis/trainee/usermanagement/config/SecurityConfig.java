@@ -21,6 +21,10 @@
 
 package uk.nhs.tis.trainee.usermanagement.config;
 
+import static org.springframework.http.HttpMethod.DELETE;
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
+
 import com.transformuk.hee.tis.profile.client.config.JwtSpringSecurityConfig;
 import com.transformuk.hee.tis.security.JwtAuthenticationEntryPoint;
 import com.transformuk.hee.tis.security.JwtAuthenticationProvider;
@@ -32,7 +36,6 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -84,9 +87,10 @@ public class SecurityConfig {
         // we don't need CSRF because our token is invulnerable
         .csrf().disable()
         .authorizeRequests()
-        .antMatchers(HttpMethod.GET, API_PATH).hasAuthority("trainee-support:view")
-        .antMatchers(HttpMethod.POST, API_PATH).hasAuthority("trainee-support:modify")
-        .antMatchers(HttpMethod.DELETE, API_PATH).hasAuthority("trainee-support:modify")
+        .antMatchers(GET, "/api/user-account/exists/*").authenticated()
+        .antMatchers(GET, API_PATH).hasAuthority("trainee-support:view")
+        .antMatchers(POST, API_PATH).hasAuthority("trainee-support:modify")
+        .antMatchers(DELETE, API_PATH).hasAuthority("trainee-support:modify")
         .anyRequest().authenticated()
         .and()
         .exceptionHandling().authenticationEntryPoint(unauthorizedHandler)

@@ -23,6 +23,7 @@ package uk.nhs.tis.trainee.usermanagement.api;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -48,6 +49,20 @@ public class UserAccountResource {
 
   UserAccountResource(UserAccountService service) {
     this.service = service;
+  }
+
+  /**
+   * Get whether a user account exists for the given username.
+   *
+   * @param username The username for the account.
+   * @return Whether an account exists.
+   */
+  @GetMapping("/exists/{username}")
+  ResponseEntity<Map<String, Boolean>> doesUserAccountExist(@PathVariable String username) {
+    log.info("Account existence requested for user '{}'.", username);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(username);
+    boolean exists = !userAccountDetails.getUserStatus().equals("NO_ACCOUNT");
+    return ResponseEntity.ok(Map.of("exists", exists));
   }
 
   /**
