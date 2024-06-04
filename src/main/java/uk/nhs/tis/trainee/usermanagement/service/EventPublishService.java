@@ -72,7 +72,7 @@ public class EventPublishService {
     DataRequestEvent dataRequestEvent = new DataRequestEvent(REQUEST_TABLE, traineeTisId);
 
     Map<String, Object> headers = new HashMap<>();
-    String messageGroupId = String.format("%s_%s_%s",REQUEST_SCHEMA, REQUEST_TABLE, traineeTisId);
+    String messageGroupId = String.format("%s_%s_%s", REQUEST_SCHEMA, REQUEST_TABLE, traineeTisId);
     headers.put("message-group-id", messageGroupId);
 
     queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent, headers);
