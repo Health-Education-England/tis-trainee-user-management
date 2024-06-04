@@ -27,6 +27,7 @@ import static io.awspring.cloud.messaging.core.TopicMessageChannel.NOTIFICATION_
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
 import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +42,9 @@ import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
 @Service
 @XRayEnabled
 public class EventPublishService {
+
+  protected static final String REQUEST_SCHEMA = "tcs";
+  protected static final String REQUEST_TABLE = "Person";
 
   private final NotificationMessagingTemplate notificationMessagingTemplate;
   private final QueueMessagingTemplate queueMessagingTemplate;
@@ -65,8 +69,13 @@ public class EventPublishService {
   public void publishSingleProfileSyncEvent(String traineeTisId) {
     log.info("Sending single profile sync event for trainee id '{}'", traineeTisId);
 
-    DataRequestEvent dataRequestEvent = new DataRequestEvent("Person", traineeTisId);
-    queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent);
+    DataRequestEvent dataRequestEvent = new DataRequestEvent(REQUEST_TABLE, traineeTisId);
+
+    Map<String, Object> headers = new HashMap<>();
+    String messageGroupId = String.format("%s_%s_%s", REQUEST_SCHEMA, REQUEST_TABLE, traineeTisId);
+    headers.put("message-group-id", messageGroupId);
+
+    queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent, headers);
   }
 
   /**

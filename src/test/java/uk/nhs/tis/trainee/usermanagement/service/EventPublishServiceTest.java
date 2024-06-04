@@ -64,10 +64,19 @@ class EventPublishServiceTest {
 
     ArgumentCaptor<DataRequestEvent> eventCaptor = ArgumentCaptor.forClass(
         DataRequestEvent.class);
-    verify(queueMessagingTemplate).convertAndSend(eq(REQUEST_QUEUE_URL), eventCaptor.capture());
+    ArgumentCaptor<Map<String, Object>> headerCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(queueMessagingTemplate).convertAndSend(eq(REQUEST_QUEUE_URL), eventCaptor.capture(),
+        headerCaptor.capture());
 
     assertThat("Unexpected table.", eventCaptor.getValue().getTable(), is("Person"));
     assertThat("Unexpected trainee ID.", eventCaptor.getValue().getId(), is(TRAINEE_ID));
+
+    Map<String, Object> headers = headerCaptor.getValue();
+    assertThat("Unexpected headers size.", headers.size(), is(1));
+    String expectedMessageGroupId = String.format("%s_%s_%s", EventPublishService.REQUEST_SCHEMA,
+        EventPublishService.REQUEST_TABLE, TRAINEE_ID);
+    assertThat("Unexpected header.", headers.get("message-group-id"),
+        is(expectedMessageGroupId));
   }
 
   @Test
