@@ -21,11 +21,11 @@
 
 package uk.nhs.tis.trainee.usermanagement.config;
 
-import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
-import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProviderClientBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.regions.providers.AwsRegionProvider;
+import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 
 /**
  * Configuration required for Cognito.
@@ -39,8 +39,11 @@ public class CognitoConfiguration {
    * @return The built client.
    */
   @Bean
-  public AWSCognitoIdentityProvider getAwsCognitoIdentityProvider(
-      @Value("${cloud.aws.region.static}") String region) {
-    return AWSCognitoIdentityProviderClientBuilder.standard().withRegion(region).build();
+  public CognitoIdentityProviderClient getCognitoIdentityProviderClient(
+      AwsRegionProvider regionProvider, AwsCredentialsProvider credentialsProvider) {
+    return CognitoIdentityProviderClient.builder()
+        .region(regionProvider.getRegion())
+        .credentialsProvider(credentialsProvider)
+        .build();
   }
 }

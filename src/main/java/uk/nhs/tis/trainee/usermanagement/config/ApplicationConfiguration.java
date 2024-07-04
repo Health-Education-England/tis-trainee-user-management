@@ -21,63 +21,17 @@
 
 package uk.nhs.tis.trainee.usermanagement.config;
 
-import com.amazonaws.services.sns.AmazonSNSAsync;
-import com.amazonaws.services.sns.AmazonSNSAsyncClientBuilder;
-import com.amazonaws.services.sqs.AmazonSQSAsync;
-import com.amazonaws.services.sqs.AmazonSQSAsyncClientBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
-import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.converter.MessageConverter;
 
+/**
+ * General application configuration beans which do not warrant their own configuration class.
+ */
 @Configuration
-public class AmazonMessagingConfig {
-
-  /**
-   * Create a default {@link AmazonSNSAsync} bean.
-   *
-   * @return The created bean.
-   */
-  @Bean
-  @Primary
-  public AmazonSNSAsync amazonSnsAsync() {
-    return AmazonSNSAsyncClientBuilder.defaultClient();
-  }
-
-  /**
-   * Create a default {@link NotificationMessagingTemplate} bean.
-   *
-   * @return The created bean.
-   */
-  @Bean
-  public NotificationMessagingTemplate notificationMessagingTemplate() {
-    return new NotificationMessagingTemplate(amazonSnsAsync());
-  }
-
-  /**
-   * Create a default {@link AmazonSQSAsync} bean.
-   *
-   * @return The created bean.
-   */
-  @Bean
-  @Primary
-  public AmazonSQSAsync amazonSqsAsync() {
-    return AmazonSQSAsyncClientBuilder.defaultClient();
-  }
-
-  /**
-   * Create a default {@link QueueMessagingTemplate} bean.
-   *
-   * @return The created bean.
-   */
-  @Bean
-  public QueueMessagingTemplate queueMessagingTemplate() {
-    return new QueueMessagingTemplate(amazonSqsAsync());
-  }
+public class ApplicationConfiguration {
 
   /**
    * Create a message converter bean with an object mapper.

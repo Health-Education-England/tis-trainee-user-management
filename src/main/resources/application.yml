@@ -24,12 +24,12 @@ application:
     key-prefix: UserManagement
     time-to-live: PT24H
 
-cloud:
-  aws:
-    region:
-      static: ${AWS_REGION}
 
 spring:
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION}
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}

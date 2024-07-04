@@ -1,16 +1,16 @@
 plugins {
   java
-  id("org.springframework.boot") version "2.7.5"
-  id("io.spring.dependency-management") version "1.1.4"
+  id("org.springframework.boot") version "3.3.1"
+  id("io.spring.dependency-management") version "1.1.5"
 
   // Code quality plugins
   checkstyle
   jacoco
-  id("org.sonarqube") version "4.4.1.3373"
+  id("org.sonarqube") version "5.1.0.4872"
 }
 
 group = "uk.nhs.tis.trainee"
-version = "1.6.1"
+version = "1.7.0"
 
 configurations {
   compileOnly {
@@ -32,8 +32,8 @@ repositories {
 
 dependencyManagement {
   imports {
-    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2021.0.8")
-    mavenBom("io.awspring.cloud:spring-cloud-aws-dependencies:2.4.4")
+    mavenBom("io.awspring.cloud:spring-cloud-aws-dependencies:3.1.1")
+    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2023.0.2")
   }
 }
 
@@ -59,18 +59,19 @@ dependencies {
   testAnnotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
 
   // Sentry reporting
-  val sentryVersion = "7.4.0"
-  implementation("io.sentry:sentry-spring-boot-starter:$sentryVersion")
+  val sentryVersion = "7.11.0"
+  implementation("io.sentry:sentry-spring-boot-starter-jakarta:$sentryVersion")
   implementation("io.sentry:sentry-logback:$sentryVersion")
 
   // Amazon AWS
-  implementation("com.amazonaws:aws-java-sdk-cognitoidp")
-  implementation("io.awspring.cloud:spring-cloud-starter-aws-messaging")
-  implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.15.1")
+  implementation("software.amazon.awssdk:cognitoidentityprovider")
+  implementation("io.awspring.cloud:spring-cloud-aws-starter-sns")
+  implementation("io.awspring.cloud:spring-cloud-aws-starter-sqs")
+  implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.16.0")
 
   testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
-  testImplementation("com.playtika.testcontainers:embedded-redis:2.3.6")
-  testImplementation("org.testcontainers:junit-jupiter:1.19.7")
+  testImplementation("com.playtika.testcontainers:embedded-redis:3.1.7")
+  testImplementation("org.testcontainers:junit-jupiter:1.19.8")
 }
 
 checkstyle {

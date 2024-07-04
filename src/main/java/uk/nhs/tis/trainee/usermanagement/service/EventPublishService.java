@@ -21,12 +21,12 @@
 
 package uk.nhs.tis.trainee.usermanagement.service;
 
-import static io.awspring.cloud.messaging.core.TopicMessageChannel.MESSAGE_GROUP_ID_HEADER;
-import static io.awspring.cloud.messaging.core.TopicMessageChannel.NOTIFICATION_SUBJECT_HEADER;
+import static io.awspring.cloud.sns.core.SnsHeaders.MESSAGE_GROUP_ID_HEADER;
+import static io.awspring.cloud.sns.core.SnsHeaders.NOTIFICATION_SUBJECT_HEADER;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
-import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
-import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
+import io.awspring.cloud.sns.core.SnsTemplate;
+import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -46,14 +46,14 @@ public class EventPublishService {
   protected static final String REQUEST_SCHEMA = "tcs";
   protected static final String REQUEST_TABLE = "Person";
 
-  private final NotificationMessagingTemplate notificationMessagingTemplate;
-  private final QueueMessagingTemplate queueMessagingTemplate;
+  private final SnsTemplate notificationMessagingTemplate;
+  private final SqsTemplate queueMessagingTemplate;
   private final String userAccountUpdateTopicArn;
   private final String queueUrl;
 
-  EventPublishService(NotificationMessagingTemplate notificationMessagingTemplate,
+  EventPublishService(SnsTemplate notificationMessagingTemplate,
       @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
-      QueueMessagingTemplate queueMessagingTemplate,
+      SqsTemplate queueMessagingTemplate,
       @Value("${application.aws.sqs.request}") String requestQueueUrl) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
     this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
@@ -75,7 +75,10 @@ public class EventPublishService {
     String messageGroupId = String.format("%s_%s_%s", REQUEST_SCHEMA, REQUEST_TABLE, traineeTisId);
     headers.put("message-group-id", messageGroupId);
 
-    queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent, headers);
+    // TODO: figure out how to test this.
+    queueMessagingTemplate.send(to -> to.queue(queueUrl)
+        .payload(dataRequestEvent)
+        .headers(headers));
   }
 
   /**

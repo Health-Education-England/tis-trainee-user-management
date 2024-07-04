@@ -21,18 +21,13 @@
 
 package uk.nhs.tis.trainee.usermanagement;
 
-import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class TisTraineeUserManagementApplicationTest {
-
-  @MockBean
-  private NotificationMessagingTemplate template;
 
   @Test
   void contextLoads() {

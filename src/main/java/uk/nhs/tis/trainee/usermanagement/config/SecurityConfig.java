@@ -38,9 +38,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -49,7 +50,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableAutoConfiguration
 @Import(JwtSpringSecurityConfig.class)
-@EnableGlobalMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity
 public class SecurityConfig {
 
   private static final String API_PATH = "/api/**";
@@ -85,19 +86,21 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
         // we don't need CSRF because our token is invulnerable
-        .csrf().disable()
-        .authorizeRequests()
-        .antMatchers(GET, "/api/user-account/exists/*").authenticated()
-        .antMatchers(GET, API_PATH).hasAuthority("trainee-support:view")
-        .antMatchers(POST, API_PATH).hasAuthority("trainee-support:modify")
-        .antMatchers(DELETE, API_PATH).hasAuthority("trainee-support:modify")
-        .anyRequest().authenticated()
-        .and()
-        .exceptionHandling().authenticationEntryPoint(unauthorizedHandler)
-        .accessDeniedHandler(accessDeniedHandler)
-        .and()
+        .csrf(AbstractHttpConfigurer::disable)
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers(GET, "/api/user-account/exists/*").authenticated()
+            .requestMatchers(GET, API_PATH).hasAuthority("trainee-support:view")
+            .requestMatchers(POST, API_PATH).hasAuthority("trainee-support:modify")
+            .requestMatchers(DELETE, API_PATH).hasAuthority("trainee-support:modify")
+            .anyRequest().authenticated()
+        )
+        .exceptionHandling(exceptionHandling -> exceptionHandling
+            .authenticationEntryPoint(unauthorizedHandler)
+            .accessDeniedHandler(accessDeniedHandler))
         // don't create session
-        .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        .sessionManagement(sessionManagement -> sessionManagement
+            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        );
     // Custom JWT based security filter
     http.addFilterBefore(authenticationTokenFilterBean(),
         UsernamePasswordAuthenticationFilter.class);
