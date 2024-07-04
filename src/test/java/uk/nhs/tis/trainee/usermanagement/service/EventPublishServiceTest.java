@@ -21,8 +21,9 @@
 
 package uk.nhs.tis.trainee.usermanagement.service;
 
-import static io.awspring.cloud.messaging.core.TopicMessageChannel.MESSAGE_GROUP_ID_HEADER;
-import static io.awspring.cloud.messaging.core.TopicMessageChannel.NOTIFICATION_SUBJECT_HEADER;
+import static io.awspring.cloud.sns.core.SnsHeaders.MESSAGE_GROUP_ID_HEADER;
+import static io.awspring.cloud.sns.core.SnsHeaders.NOTIFICATION_SUBJECT_HEADER;
+import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,13 +31,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
-import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
+import io.awspring.cloud.sns.core.SnsTemplate;
+import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.messaging.Message;
 import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
 
@@ -48,38 +50,38 @@ class EventPublishServiceTest {
   private static final String USER_ID = UUID.randomUUID().toString();
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
-  private NotificationMessagingTemplate notificationMessagingTemplate;
-  private QueueMessagingTemplate queueMessagingTemplate;
+  private SnsTemplate notificationMessagingTemplate;
+  private SqsTemplate queueMessagingTemplate;
 
   @BeforeEach
   void setUp() {
     metricsService = mock(MetricsService.class);
-    notificationMessagingTemplate = mock(NotificationMessagingTemplate.class);
-    queueMessagingTemplate = mock(QueueMessagingTemplate.class);
+    notificationMessagingTemplate = mock(SnsTemplate.class);
+    queueMessagingTemplate = mock(SqsTemplate.class);
     eventPublishService = new EventPublishService(notificationMessagingTemplate,
         USER_ACCOUNT_UPDATE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL, metricsService);
   }
 
   @Test
   void shouldPublishProfileSyncEvent() {
-
+    // TODO: figure out how to make this test work.
     eventPublishService.publishSingleProfileSyncEvent(TRAINEE_ID);
 
-    ArgumentCaptor<DataRequestEvent> eventCaptor = ArgumentCaptor.forClass(
-        DataRequestEvent.class);
-    ArgumentCaptor<Map<String, Object>> headerCaptor = ArgumentCaptor.forClass(Map.class);
-    verify(queueMessagingTemplate).convertAndSend(eq(REQUEST_QUEUE_URL), eventCaptor.capture(),
-        headerCaptor.capture());
+    ArgumentCaptor<Message<DataRequestEvent>> messageCaptor = ArgumentCaptor.captor();
+    verify(queueMessagingTemplate).send(eq(REQUEST_QUEUE_URL), messageCaptor.capture());
 
-    assertThat("Unexpected table.", eventCaptor.getValue().getTable(), is("Person"));
-    assertThat("Unexpected trainee ID.", eventCaptor.getValue().getId(), is(TRAINEE_ID));
+    Message<DataRequestEvent> message = messageCaptor.getValue();
+    DataRequestEvent event = message.getPayload();
+    assertThat("Unexpected table.", event.getTable(), is("Person"));
+    assertThat("Unexpected trainee ID.", event.getId(), is(TRAINEE_ID));
 
-    Map<String, Object> headers = headerCaptor.getValue();
-    assertThat("Unexpected headers size.", headers.size(), is(1));
+    Map<String, Object> headers = message.getHeaders();
+    assertThat("Unexpected headers size.", headers.size(), is(3));
+    assertThat("Unexpected headers.", headers.keySet(),
+        hasItems("id", "timestamp", "message-group-id"));
     String expectedMessageGroupId = String.format("%s_%s_%s", EventPublishService.REQUEST_SCHEMA,
         EventPublishService.REQUEST_TABLE, TRAINEE_ID);
-    assertThat("Unexpected header.", headers.get("message-group-id"),
-        is(expectedMessageGroupId));
+    assertThat("Unexpected header.", headers.get("message-group-id"), is(expectedMessageGroupId));
     verify(metricsService).incrementResyncCounter();
   }
 
@@ -90,8 +92,8 @@ class EventPublishServiceTest {
 
     eventPublishService.publishEmailUpdateEvent(USER_ID, TRAINEE_ID, previousEmail, newEmail);
 
-    ArgumentCaptor<EmailUpdateEvent> eventCaptor = ArgumentCaptor.forClass(EmailUpdateEvent.class);
-    ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.forClass(Map.class);
+    ArgumentCaptor<EmailUpdateEvent> eventCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.captor();
     verify(notificationMessagingTemplate).convertAndSend(eq(USER_ACCOUNT_UPDATE_TOPIC),
         eventCaptor.capture(), headersCaptor.capture());
 

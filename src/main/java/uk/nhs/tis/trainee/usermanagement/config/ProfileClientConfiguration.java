@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright 2022 Crown Copyright (Health Education England)
+ * Copyright 2025 Crown Copyright (Health Education England)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -21,29 +21,44 @@
 
 package uk.nhs.tis.trainee.usermanagement.config;
 
+import com.transformuk.hee.tis.profile.client.service.impl.JwtProfileServiceImpl;
+import com.transformuk.hee.tis.security.service.JwtProfileService;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.regions.providers.AwsRegionProvider;
-import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
 
 /**
- * Configuration required for Cognito.
+ * Manually configure the profile service's rest template as the profile-client dependency is not
+ * fully compatible with Spring Boot 3.
  */
 @Configuration
-public class CognitoConfiguration {
+public class ProfileClientConfiguration {
+
+  private final int timeout;
+
+  public ProfileClientConfiguration(@Value("${PROFILE_REST_TIMEOUT:30000}") int timeout) {
+    this.timeout = timeout;
+  }
+
 
   /**
-   * Get a default Cognito IDP client.
+   * Create a {@link JwtProfileService} bean.
    *
-   * @return The built client.
+   * @param builder The rest template builder.
+   * @return The created bean.
    */
   @Bean
-  public CognitoIdentityProviderClient getCognitoIdentityProviderClient(
-      AwsRegionProvider regionProvider, AwsCredentialsProvider credentialsProvider) {
-    return CognitoIdentityProviderClient.builder()
-        .region(regionProvider.getRegion())
-        .credentialsProvider(credentialsProvider)
+  public JwtProfileService jwtProfileService(RestTemplateBuilder builder) {
+    Duration timeoutDuration = Duration.ofSeconds(timeout);
+    RestTemplate restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
+        .setReadTimeout(timeoutDuration)
+        .setConnectTimeout(timeoutDuration)
         .build();
+
+    return new JwtProfileServiceImpl(restTemplate);
   }
 }

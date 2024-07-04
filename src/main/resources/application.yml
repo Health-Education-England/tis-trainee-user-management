@@ -24,14 +24,14 @@ application:
     key-prefix: UserManagement
     time-to-live: PT24H
 
-cloud:
-  aws:
-    region:
-      static: ${AWS_REGION}
-    cloudwatch:
-      namespace: TIS/Trainee/UserManagement
 
 spring:
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION}
+    cloudwatch:
+      namespace: TIS/Trainee/UserManagement
   redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}

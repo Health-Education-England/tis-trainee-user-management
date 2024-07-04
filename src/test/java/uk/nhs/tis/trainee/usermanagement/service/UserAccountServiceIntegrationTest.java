@@ -29,11 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
-import com.amazonaws.services.cognitoidp.model.AttributeType;
-import com.amazonaws.services.cognitoidp.model.ListUsersResult;
-import com.amazonaws.services.cognitoidp.model.UserType;
-import io.awspring.cloud.messaging.listener.SimpleMessageListenerContainer;
+import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -50,6 +46,10 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 
 @SpringBootTest(properties = {"embedded.containers.enabled=true", "embedded.redis.enabled=true"})
 @ActiveProfiles({"redis", "test"})
@@ -65,13 +65,13 @@ class UserAccountServiceIntegrationTest {
   private static final String ATTRIBUTE_USER_ID = "sub";
 
   @MockBean
-  private AWSCognitoIdentityProvider cognitoIdp;
+  private CognitoIdentityProviderClient cognitoClient;
 
   @MockBean
   private EventPublishService eventPublishService;
 
   @MockBean
-  private SimpleMessageListenerContainer listenerContainer;
+  private SqsTemplate sqsTemplate;
 
   @Autowired
   UserAccountService service;
@@ -90,15 +90,18 @@ class UserAccountServiceIntegrationTest {
 
   @Test
   void shouldBuildUserAccountIdCacheWhenPersonNotInCache() {
-    UserType user = new UserType().withAttributes(
-        new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID),
-        new AttributeType().withName(ATTRIBUTE_USER_ID).withValue(USER_ID)
-    );
+    UserType user = UserType.builder()
+        .attributes(
+            at1 -> at1.name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID),
+            at2 -> at2.name(ATTRIBUTE_USER_ID).value(USER_ID)
+        )
+        .build();
 
-    ListUsersResult result = new ListUsersResult();
-    result.setUsers(List.of(user));
+    ListUsersResponse response = ListUsersResponse.builder()
+        .users(List.of(user))
+        .build();
 
-    when(cognitoIdp.listUsers(any())).thenReturn(result);
+    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(response);
 
     Set<String> returnedUserIds = service.getUserAccountIds(TRAINEE_ID);
 
@@ -113,15 +116,18 @@ class UserAccountServiceIntegrationTest {
 
   @Test
   void shouldReturnEmptyWhenPersonNotFoundAfterBuildingCache() {
-    UserType user = new UserType().withAttributes(
-        new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID),
-        new AttributeType().withName(ATTRIBUTE_USER_ID).withValue(USER_ID)
-    );
+    UserType user = UserType.builder()
+        .attributes(
+            at1 -> at1.name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID),
+            at2 -> at2.name(ATTRIBUTE_USER_ID).value(USER_ID)
+        )
+        .build();
 
-    ListUsersResult result = new ListUsersResult();
-    result.setUsers(List.of(user));
+    ListUsersResponse response = ListUsersResponse.builder()
+        .users(List.of(user))
+        .build();
 
-    when(cognitoIdp.listUsers(any())).thenReturn(result);
+    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(response);
 
     Set<String> returnedUserIds = service.getUserAccountIds("notFound");
 
@@ -137,6 +143,6 @@ class UserAccountServiceIntegrationTest {
     assertThat("Unexpected user IDs count.", returnedUserIds.size(), is(1));
     assertThat("Unexpected user IDs.", returnedUserIds, hasItem(USER_ID));
 
-    verifyNoInteractions(cognitoIdp);
+    verifyNoInteractions(cognitoClient);
   }
 }

@@ -21,9 +21,7 @@
 
 package uk.nhs.tis.trainee.usermanagement.event;
 
-import static io.awspring.cloud.messaging.listener.SqsMessageDeletionPolicy.ON_SUCCESS;
-
-import io.awspring.cloud.messaging.listener.annotation.SqsListener;
+import io.awspring.cloud.sqs.annotation.SqsListener;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -46,8 +44,7 @@ public class ContactDetailsListener {
    *
    * @param event The contact details update event.
    */
-  @SqsListener(
-      value = "${application.aws.sqs.contact-details.updated}", deletionPolicy = ON_SUCCESS)
+  @SqsListener("${application.aws.sqs.contact-details.updated}")
   public void handleContactDetailsUpdate(ContactDetailsEvent event) {
     log.info("Received contact details update event '{}'.", event.getContactDetails());
 
