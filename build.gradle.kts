@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "1.6.1"
+version = "1.7.0"
 
 configurations {
   compileOnly {
@@ -34,6 +34,7 @@ dependencyManagement {
   imports {
     mavenBom("org.springframework.cloud:spring-cloud-dependencies:2021.0.8")
     mavenBom("io.awspring.cloud:spring-cloud-aws-dependencies:2.4.4")
+    mavenBom("software.amazon.awssdk:bom:2.17.14")
   }
 }
 
@@ -67,6 +68,10 @@ dependencies {
   implementation("com.amazonaws:aws-java-sdk-cognitoidp")
   implementation("io.awspring.cloud:spring-cloud-starter-aws-messaging")
   implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.15.1")
+
+  //Amazon Cloudwatch
+  implementation("io.micrometer:micrometer-core")
+  implementation("io.micrometer:micrometer-registry-cloudwatch2")
 
   testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
   testImplementation("com.playtika.testcontainers:embedded-redis:2.3.6")
