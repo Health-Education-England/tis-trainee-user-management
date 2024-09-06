@@ -31,6 +31,7 @@ import static org.mockito.Mockito.verify;
 
 import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
 import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +55,8 @@ class EventPublishServiceTest {
     notificationMessagingTemplate = mock(NotificationMessagingTemplate.class);
     queueMessagingTemplate = mock(QueueMessagingTemplate.class);
     eventPublishService = new EventPublishService(notificationMessagingTemplate,
-        USER_ACCOUNT_UPDATE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL);
+        USER_ACCOUNT_UPDATE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL,
+        mock(MeterRegistry.class), "test");
   }
 
   @Test

@@ -60,6 +60,7 @@ import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import com.amazonaws.services.cognitoidp.model.UserType;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashSet;
@@ -106,7 +107,8 @@ class UserAccountServiceTest {
 
     eventPublishService = mock(EventPublishService.class);
 
-    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager, eventPublishService);
+    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager, eventPublishService,
+        mock(MeterRegistry.class), "test");
 
     // Initialize groups as an empty list instead of null, which reflects default AWS API behaviour.
     AdminListGroupsForUserResult mockGroupResult = new AdminListGroupsForUserResult();
