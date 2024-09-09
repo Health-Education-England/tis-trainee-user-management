@@ -39,13 +39,16 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 public class AmazonCloudwatchConfig {
 
   private final String awsRegion;
+  private final String metricsNamespace;
   private final String awsAccessKey;
   private final String awsSecret;
 
   public AmazonCloudwatchConfig(@Value("${cloud.aws.region.static}") String awsRegion,
+                                @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace,
                                 @Value("${cloud.aws.cloudwatch.awsAccessKey}") String awsAccessKey,
                                 @Value("${cloud.aws.cloudwatch.awsSecret}") String awsSecret) {
     this.awsRegion = awsRegion;
+    this.metricsNamespace = metricsNamespace;
     this.awsAccessKey = awsAccessKey;
     this.awsSecret = awsSecret;
   }
@@ -74,17 +77,14 @@ public class AmazonCloudwatchConfig {
   public MeterRegistry getMeterRegistry() {
     CloudWatchConfig cloudWatchConfig = setupCloudWatchConfig();
 
-    MeterRegistry meterRegistry = new CloudWatchMeterRegistry(cloudWatchConfig, Clock.SYSTEM,
-        cloudWatchAsyncClient());
-
-    return meterRegistry;
+    return new CloudWatchMeterRegistry(cloudWatchConfig, Clock.SYSTEM, cloudWatchAsyncClient());
   }
 
   private CloudWatchConfig setupCloudWatchConfig() {
-    CloudWatchConfig cloudWatchConfig = new CloudWatchConfig() {
+    return new CloudWatchConfig() {
 
-      private Map<String, String> configuration
-          = Map.of("cloudwatch.namespace", "TIS/Trainee/UserManagement",
+      private final Map<String, String> configuration
+          = Map.of("cloudwatch.namespace", metricsNamespace,
           "cloudwatch.step", Duration.ofMinutes(1).toString());
 
       @Override
@@ -92,6 +92,5 @@ public class AmazonCloudwatchConfig {
         return configuration.get(key);
       }
     };
-    return cloudWatchConfig;
   }
 }

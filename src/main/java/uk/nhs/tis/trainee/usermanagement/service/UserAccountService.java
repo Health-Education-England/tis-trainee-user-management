@@ -45,16 +45,12 @@ import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import com.amazonaws.services.cognitoidp.model.UserType;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -80,8 +76,7 @@ public class UserAccountService {
   private static final String NO_MFA = "NO_MFA";
   private static final Integer MAX_LOGIN_EVENTS = 10;
 
-  private static final String METRIC_NAME_MFA_RESET = "account.mfa.reset";
-  private static final String METRIC_NAME_ACCOUNT_DELETE = "account.delete";
+  private final MetricsService metricsService;
 
   private final AWSCognitoIdentityProvider cognitoIdp;
   private final String userPoolId;
@@ -91,35 +86,15 @@ public class UserAccountService {
 
   private Instant lastUserCaching = null;
 
-  private final Map<MfaType, Map<UserStatusType, Counter>> deleteAccountCounters;
-  private final Map<MfaType, Counter> resetMfaCounters;
-
   UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
       CacheManager cacheManager, EventPublishService eventPublishService,
-                     MeterRegistry meterRegistry,
-                     @Value("${application.environment}") String environment) {
+                     MetricsService metricsService) {
     this.cognitoIdp = cognitoIdp;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
     this.eventPublishService = eventPublishService;
-
-    this.deleteAccountCounters = new EnumMap<>(MfaType.class);
-    this.resetMfaCounters = new EnumMap<>(MfaType.class);
-    for (MfaType mfaType : MfaType.values()) {
-      Map<UserStatusType, Counter> userStatusTypeMap = new EnumMap<>(UserStatusType.class);
-      for (UserStatusType userStatusType : UserStatusType.values()) {
-        userStatusTypeMap.put(userStatusType,
-            meterRegistry.counter(METRIC_NAME_ACCOUNT_DELETE,
-                "Environment", environment,
-                "UserStatus", userStatusType.toString(),
-                "MfaType", mfaType.name()));
-      }
-      this.deleteAccountCounters.put(mfaType, userStatusTypeMap);
-      this.resetMfaCounters.put(mfaType, meterRegistry.counter(METRIC_NAME_MFA_RESET,
-          "Environment", environment,
-          "MfaType", mfaType.name()));
-    }
+    this.metricsService = metricsService;
   }
 
   /**
@@ -295,12 +270,9 @@ public class UserAccountService {
    */
   public void resetUserAccountMfa(String username) {
     log.info("Resetting MFA for user '{}'.", username);
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
+    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
 
-    MfaType oldMfaType = getUserMfaType(username);
-    this.resetMfaCounters.get(oldMfaType).increment();
+    metricsService.incrementMfaResetCounter(getUserMfaType(username));
 
     request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
     request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
@@ -322,7 +294,7 @@ public class UserAccountService {
 
     MfaType oldMfaType = getUserMfaType(username);
     UserStatusType userStatusType = getUserStatus(username);
-    deleteAccountCounters.get(oldMfaType).get(userStatusType).increment();
+    metricsService.incrementDeleteAccountCounter(oldMfaType, userStatusType);
 
     cognitoIdp.adminDeleteUser(request);
     log.info("Deleted Cognito account for user '{}'.", username);
@@ -444,11 +416,13 @@ public class UserAccountService {
         });
   }
 
-  public MfaType getUserMfaType(String username) {
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
+  protected MfaType getUserMfaType(String username) {
+    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
 
+    if (request.getSoftwareTokenMfaSettings() == null) {
+      //should not happen
+      return MfaType.NO_MFA;
+    }
     if (Boolean.TRUE.equals(request.getSoftwareTokenMfaSettings().getEnabled())) {
       return MfaType.TOTP;
     }
@@ -458,7 +432,14 @@ public class UserAccountService {
     return MfaType.NO_MFA;
   }
 
-  public UserStatusType getUserStatus(String username) {
+  protected AdminSetUserMFAPreferenceRequest getMfaPreferenceRequest(String username) {
+    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+    return request;
+  }
+
+  private UserStatusType getUserStatus(String username) {
     AdminGetUserRequest request = new AdminGetUserRequest();
     request.setUserPoolId(userPoolId);
     request.setUsername(username);

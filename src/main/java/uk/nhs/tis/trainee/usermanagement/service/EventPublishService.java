@@ -27,8 +27,6 @@ import static io.awspring.cloud.messaging.core.TopicMessageChannel.NOTIFICATION_
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
 import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -52,19 +50,18 @@ public class EventPublishService {
   private final QueueMessagingTemplate queueMessagingTemplate;
   private final String userAccountUpdateTopicArn;
   private final String queueUrl;
-  private final Counter syncCounter;
+  private final MetricsService metricsService;
 
   EventPublishService(NotificationMessagingTemplate notificationMessagingTemplate,
-      @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
-      QueueMessagingTemplate queueMessagingTemplate,
-      @Value("${application.aws.sqs.request}") String requestQueueUrl,
-      MeterRegistry meterRegistry,
-      @Value("${application.environment}") String environment) {
+                      @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
+                      QueueMessagingTemplate queueMessagingTemplate,
+                      @Value("${application.aws.sqs.request}") String requestQueueUrl,
+                      MetricsService metricsService) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
     this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
     this.queueMessagingTemplate = queueMessagingTemplate;
     this.queueUrl = requestQueueUrl;
-    syncCounter = meterRegistry.counter("data.resync", "Environment", environment);
+    this.metricsService = metricsService;
   }
 
   /**
@@ -83,7 +80,7 @@ public class EventPublishService {
 
     queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent, headers);
 
-    syncCounter.increment();
+    metricsService.incrementResyncCounter();
   }
 
   /**
