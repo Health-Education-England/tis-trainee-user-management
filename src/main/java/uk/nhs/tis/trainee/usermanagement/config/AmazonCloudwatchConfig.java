@@ -35,6 +35,9 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 
+/**
+ * A configuration class for AWS Cloudwatch metrics.
+ */
 @Configuration
 public class AmazonCloudwatchConfig {
 
@@ -43,6 +46,14 @@ public class AmazonCloudwatchConfig {
   private final String awsAccessKey;
   private final String awsSecret;
 
+  /**
+   * Initialise the class.
+   *
+   * @param awsRegion The AWS region to use.
+   * @param metricsNamespace The metrics namespace to use.
+   * @param awsAccessKey The AWS access key to use.
+   * @param awsSecret The AWS secret key to use.
+   */
   public AmazonCloudwatchConfig(@Value("${cloud.aws.region.static}") String awsRegion,
                                 @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace,
                                 @Value("${cloud.aws.cloudwatch.awsAccessKey}") String awsAccessKey,
@@ -53,6 +64,11 @@ public class AmazonCloudwatchConfig {
     this.awsSecret = awsSecret;
   }
 
+  /**
+   * A builder for an asynchronous CloudWatch client.
+   *
+   * @return the configured client.
+   */
   @Bean
   public CloudWatchAsyncClient cloudWatchAsyncClient() {
     return CloudWatchAsyncClient.builder()
@@ -73,6 +89,11 @@ public class AmazonCloudwatchConfig {
         .build();
   }
 
+  /**
+   * Get the MeterRegistry for the metrics.
+   *
+   * @return The CloudWatch meter registry.
+   */
   @Bean
   public MeterRegistry getMeterRegistry() {
     CloudWatchConfig cloudWatchConfig = setupCloudWatchConfig();
@@ -80,6 +101,11 @@ public class AmazonCloudwatchConfig {
     return new CloudWatchMeterRegistry(cloudWatchConfig, Clock.SYSTEM, cloudWatchAsyncClient());
   }
 
+  /**
+   * Get AWS CloudWatch configuration with defined namespace and heartbeat.
+   *
+   * @return The CloudWatch configuration instance.
+   */
   private CloudWatchConfig setupCloudWatchConfig() {
     return new CloudWatchConfig() {
 
