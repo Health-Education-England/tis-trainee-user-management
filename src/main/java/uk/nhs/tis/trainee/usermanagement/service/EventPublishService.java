@@ -53,10 +53,10 @@ public class EventPublishService {
   private final MetricsService metricsService;
 
   EventPublishService(NotificationMessagingTemplate notificationMessagingTemplate,
-                      @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
-                      QueueMessagingTemplate queueMessagingTemplate,
-                      @Value("${application.aws.sqs.request}") String requestQueueUrl,
-                      MetricsService metricsService) {
+      @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
+      QueueMessagingTemplate queueMessagingTemplate,
+      @Value("${application.aws.sqs.request}") String requestQueueUrl,
+      MetricsService metricsService) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
     this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
     this.queueMessagingTemplate = queueMessagingTemplate;

@@ -1,3 +1,24 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright 2022 Crown Copyright (Health Education England)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+ * NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package uk.nhs.tis.trainee.usermanagement.service;
 
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
@@ -28,6 +49,12 @@ public class MetricsService {
   private final Map<MfaType, Counter> resetMfaCounters;
   private final Counter resyncCounter;
 
+  /**
+   * Initialise the metrics service.
+   *
+   * @param meterRegistry The Meter Registry to use.
+   * @param environment   The running environment to use.
+   */
   public MetricsService(MeterRegistry meterRegistry,
                         @Value("${application.environment}") String environment) {
 
@@ -53,6 +80,11 @@ public class MetricsService {
     this.resetMfaCounters.get(MfaType.TOTP).increment(5.0);
   }
 
+  /**
+   * Increment the MFA Reset counter.
+   *
+   * @param mfaType The MFA type whose counter should be incremented.
+   */
   public void incrementMfaResetCounter(MfaType mfaType) {
     if (mfaType != null) {
       this.resetMfaCounters.get(mfaType).increment();
@@ -61,10 +93,19 @@ public class MetricsService {
     }
   }
 
+  /**
+   * Increment the Delete Account counter.
+   *
+   * @param mfaType The MFA type whose counter should be incremented.
+   * @param userStatusType The User Status whose counter should be incremented.
+   */
   public void incrementDeleteAccountCounter(MfaType mfaType, UserStatusType userStatusType) {
     deleteAccountCounters.get(mfaType).get(userStatusType).increment();
   }
 
+  /**
+   * Increment the Account Resync counter.
+   */
   public void incrementResyncCounter() {
     this.resyncCounter.increment();
   }

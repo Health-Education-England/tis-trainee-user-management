@@ -115,8 +115,8 @@ class UserAccountServiceTest {
     eventPublishService = mock(EventPublishService.class);
     metricsService = mock(MetricsService.class);
 
-    service = spy(new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager, eventPublishService,
-        metricsService));
+    service = spy(new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager,
+        eventPublishService, metricsService));
 
     // Initialize groups as an empty list instead of null, which reflects default AWS API behaviour.
     AdminListGroupsForUserResult mockGroupResult = new AdminListGroupsForUserResult();
@@ -746,7 +746,8 @@ class UserAccountServiceTest {
    *
    * @return the mocked AdminSetUserMFAPreferenceRequest.
    */
-  private AdminSetUserMFAPreferenceRequest getMockedMfaRequest(boolean enableTotp, boolean enableSms) {
+  private AdminSetUserMFAPreferenceRequest getMockedMfaRequest(
+      boolean enableTotp, boolean enableSms) {
     AdminSetUserMFAPreferenceRequest mfaRequest = mock(AdminSetUserMFAPreferenceRequest.class);
     SoftwareTokenMfaSettingsType totpMfa = new SoftwareTokenMfaSettingsType();
     totpMfa.setEnabled(enableTotp);
@@ -756,5 +757,4 @@ class UserAccountServiceTest {
     when(mfaRequest.getSMSMfaSettings()).thenReturn(smsMfa);
     return mfaRequest;
   }
-
 }
