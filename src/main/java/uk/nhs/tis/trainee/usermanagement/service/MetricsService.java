@@ -45,9 +45,9 @@ public class MetricsService {
   protected static final String TAG_MFA = "MfaType";
   protected static final String TAG_USER_STATUS = "UserStatus";
 
-  private final Map<MfaType, Map<UserStatusType, Counter>> deleteAccountCounters;
-  private final Map<MfaType, Counter> resetMfaCounters;
-  private final Counter resyncCounter;
+  protected final Map<MfaType, Map<UserStatusType, Counter>> deleteAccountCounters;
+  protected final Map<MfaType, Counter> resetMfaCounters;
+  protected final Counter resyncCounter;
 
   /**
    * Initialise the metrics service.
@@ -86,11 +86,7 @@ public class MetricsService {
    * @param mfaType The MFA type whose counter should be incremented.
    */
   public void incrementMfaResetCounter(MfaType mfaType) {
-    if (mfaType != null) {
-      this.resetMfaCounters.get(mfaType).increment();
-    } else {
-      log.warn("Cannot increment null MFA counter");
-    }
+    this.resetMfaCounters.get(mfaType).increment();
   }
 
   /**
