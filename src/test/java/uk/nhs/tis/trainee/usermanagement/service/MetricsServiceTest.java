@@ -71,7 +71,7 @@ class MetricsServiceTest {
 
     Meter.Id idResync = new Meter.Id("resync", Tags.empty(), null, null, Meter.Type.COUNTER);
     Counter counterResync = new CumulativeCounter(idResync);
-    when(meterRegistry.counter(eq(METRIC_RESYNC))).thenReturn(counterResync);
+    when(meterRegistry.counter(METRIC_RESYNC)).thenReturn(counterResync);
 
     service = new MetricsService(meterRegistry);
   }
