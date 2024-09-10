@@ -28,6 +28,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
@@ -39,6 +40,7 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 public class AmazonCloudwatchConfig {
 
   private final String metricsNamespace;
+  private final String environment;
 
   /**
    * Initialise the class.
@@ -46,8 +48,10 @@ public class AmazonCloudwatchConfig {
    * @param metricsNamespace The metrics namespace to use.
    */
   public AmazonCloudwatchConfig(
-      @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace) {
+      @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace,
+      @Value("${application.environment}") String environment) {
     this.metricsNamespace = metricsNamespace;
+    this.environment = environment;
   }
 
   /**
@@ -89,5 +93,15 @@ public class AmazonCloudwatchConfig {
         return configuration.get(key);
       }
     };
+  }
+
+  /**
+   * Configure default metric tags.
+   *
+   * @return The configured MeterRegistry.
+   */
+  @Bean
+  MeterRegistryCustomizer<MeterRegistry> metricsCommonTags() {
+    return registry -> registry.config().commonTags("Environment", this.environment);
   }
 }

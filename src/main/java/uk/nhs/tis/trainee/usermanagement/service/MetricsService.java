@@ -27,7 +27,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.EnumMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
@@ -41,7 +40,6 @@ public class MetricsService {
   protected static final String METRIC_NAME_ACCOUNT_DELETE = "account.delete";
   protected static final String METRIC_RESYNC = "data.resync";
 
-  protected static final String TAG_ENVIRONMENT = "Environment";
   protected static final String TAG_MFA = "MfaType";
   protected static final String TAG_USER_STATUS = "UserStatus";
 
@@ -53,10 +51,8 @@ public class MetricsService {
    * Initialise the metrics service.
    *
    * @param meterRegistry The Meter Registry to use.
-   * @param environment   The running environment to use.
    */
-  public MetricsService(MeterRegistry meterRegistry,
-                        @Value("${application.environment}") String environment) {
+  public MetricsService(MeterRegistry meterRegistry) {
 
     this.deleteAccountCounters = new EnumMap<>(MfaType.class);
     this.resetMfaCounters = new EnumMap<>(MfaType.class);
@@ -65,17 +61,15 @@ public class MetricsService {
       for (UserStatusType userStatusType : UserStatusType.values()) {
         userStatusTypeMap.put(userStatusType,
             meterRegistry.counter(METRIC_NAME_ACCOUNT_DELETE,
-                TAG_ENVIRONMENT, environment,
                 TAG_USER_STATUS, userStatusType.toString(),
                 TAG_MFA, mfaType.name()));
       }
       this.deleteAccountCounters.put(mfaType, userStatusTypeMap);
       this.resetMfaCounters.put(mfaType, meterRegistry.counter(METRIC_NAME_MFA_RESET,
-          TAG_ENVIRONMENT, environment,
           TAG_MFA, mfaType.name()));
     }
 
-    resyncCounter = meterRegistry.counter(METRIC_RESYNC, TAG_ENVIRONMENT, environment);
+    resyncCounter = meterRegistry.counter(METRIC_RESYNC);
   }
 
   /**

@@ -61,22 +61,19 @@ class MetricsServiceTest {
     Counter counterAccountDelete = new CumulativeCounter(idAccountDelete);
 
     when(meterRegistry.counter(eq(METRIC_NAME_ACCOUNT_DELETE),
-        any(), any(),
         eq(TAG_USER_STATUS), any(),
         eq(TAG_MFA), any())).thenReturn(counterAccountDelete);
 
     Meter.Id idResetMfa = new Meter.Id("resetMfa", Tags.empty(), null, null, Meter.Type.COUNTER);
     Counter counterResetMfa = new CumulativeCounter(idResetMfa);
     when(meterRegistry.counter(eq(METRIC_NAME_MFA_RESET),
-        any(), any(),
         eq(TAG_MFA), any())).thenReturn(counterResetMfa);
 
     Meter.Id idResync = new Meter.Id("resync", Tags.empty(), null, null, Meter.Type.COUNTER);
     Counter counterResync = new CumulativeCounter(idResync);
-    when(meterRegistry.counter(eq(METRIC_RESYNC),
-        any(), any())).thenReturn(counterResync);
+    when(meterRegistry.counter(eq(METRIC_RESYNC))).thenReturn(counterResync);
 
-    service = new MetricsService(meterRegistry, "test");
+    service = new MetricsService(meterRegistry);
   }
 
   @ParameterizedTest
