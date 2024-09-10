@@ -70,7 +70,6 @@ dependencies {
   implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.15.1")
 
   //Amazon Cloudwatch
-  implementation("io.awspring.cloud:spring-cloud-aws-autoconfigure")
   implementation("io.micrometer:micrometer-core")
   implementation("io.micrometer:micrometer-registry-cloudwatch2")
 

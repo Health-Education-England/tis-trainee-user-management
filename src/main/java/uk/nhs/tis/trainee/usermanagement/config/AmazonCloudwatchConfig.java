@@ -48,7 +48,6 @@ public class AmazonCloudwatchConfig {
   public AmazonCloudwatchConfig(
       @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace) {
     this.metricsNamespace = metricsNamespace;
-
   }
 
   /**
@@ -58,7 +57,7 @@ public class AmazonCloudwatchConfig {
    */
   @Bean
   public CloudWatchAsyncClient cloudWatchAsyncClient() {
-    return CloudWatchAsyncClient.builder().build();
+    return CloudWatchAsyncClient.create();
   }
 
   /**
