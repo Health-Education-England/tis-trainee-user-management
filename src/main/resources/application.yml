@@ -30,8 +30,6 @@ cloud:
       static: ${AWS_REGION}
     cloudwatch:
       namespace: TIS/Trainee/UserManagement
-      awsAccessKey: ${AWS_ACCESS_KEY_ID:}
-      awsSecret: ${AWS_SECRET_ACCESS_KEY:}
 
 spring:
   redis:

@@ -28,6 +28,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
@@ -76,8 +77,6 @@ public class MetricsService {
     }
 
     resyncCounter = meterRegistry.counter(METRIC_RESYNC, TAG_ENVIRONMENT, environment);
-
-    this.resetMfaCounters.get(MfaType.TOTP).increment(5.0);
   }
 
   /**

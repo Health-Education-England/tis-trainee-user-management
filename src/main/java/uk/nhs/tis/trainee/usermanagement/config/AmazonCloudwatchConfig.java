@@ -30,9 +30,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import software.amazon.awssdk.auth.credentials.AwsCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 
 /**
@@ -41,27 +38,17 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
 @Configuration
 public class AmazonCloudwatchConfig {
 
-  private final String awsRegion;
   private final String metricsNamespace;
-  private final String awsAccessKey;
-  private final String awsSecret;
 
   /**
    * Initialise the class.
    *
-   * @param awsRegion The AWS region to use.
    * @param metricsNamespace The metrics namespace to use.
-   * @param awsAccessKey The AWS access key to use.
-   * @param awsSecret The AWS secret key to use.
    */
-  public AmazonCloudwatchConfig(@Value("${cloud.aws.region.static}") String awsRegion,
-                                @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace,
-                                @Value("${cloud.aws.cloudwatch.awsAccessKey}") String awsAccessKey,
-                                @Value("${cloud.aws.cloudwatch.awsSecret}") String awsSecret) {
-    this.awsRegion = awsRegion;
+  public AmazonCloudwatchConfig(
+      @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace) {
     this.metricsNamespace = metricsNamespace;
-    this.awsAccessKey = awsAccessKey;
-    this.awsSecret = awsSecret;
+
   }
 
   /**
@@ -71,22 +58,7 @@ public class AmazonCloudwatchConfig {
    */
   @Bean
   public CloudWatchAsyncClient cloudWatchAsyncClient() {
-    return CloudWatchAsyncClient.builder()
-        .region(Region.of(awsRegion))
-        .credentialsProvider(
-            StaticCredentialsProvider.create(new AwsCredentials() {
-              @Override
-              public String accessKeyId() {
-                return awsAccessKey;
-              }
-
-              @Override
-              public String secretAccessKey() {
-                return awsSecret;
-              }
-            })
-        )
-        .build();
+    return CloudWatchAsyncClient.builder().build();
   }
 
   /**
