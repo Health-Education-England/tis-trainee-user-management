@@ -67,7 +67,7 @@ dependencies {
   // Amazon AWS
   implementation("com.amazonaws:aws-java-sdk-cognitoidp")
   implementation("io.awspring.cloud:spring-cloud-starter-aws-messaging")
-  implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.15.1")
+  implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.18.2")
 
   //Amazon Cloudwatch
   implementation("io.micrometer:micrometer-core")
