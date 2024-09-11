@@ -28,6 +28,8 @@ cloud:
   aws:
     region:
       static: ${AWS_REGION}
+    cloudwatch:
+      namespace: TIS/Trainee/UserManagement
 
 spring:
   redis:

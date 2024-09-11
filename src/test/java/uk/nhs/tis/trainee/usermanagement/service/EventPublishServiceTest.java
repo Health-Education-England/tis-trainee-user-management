@@ -28,6 +28,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
 import io.awspring.cloud.messaging.core.QueueMessagingTemplate;
@@ -46,15 +47,17 @@ class EventPublishServiceTest {
   private static final String TRAINEE_ID = "11111";
   private static final String USER_ID = UUID.randomUUID().toString();
   private EventPublishService eventPublishService;
+  private MetricsService metricsService;
   private NotificationMessagingTemplate notificationMessagingTemplate;
   private QueueMessagingTemplate queueMessagingTemplate;
 
   @BeforeEach
   void setUp() {
+    metricsService = mock(MetricsService.class);
     notificationMessagingTemplate = mock(NotificationMessagingTemplate.class);
     queueMessagingTemplate = mock(QueueMessagingTemplate.class);
     eventPublishService = new EventPublishService(notificationMessagingTemplate,
-        USER_ACCOUNT_UPDATE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL);
+        USER_ACCOUNT_UPDATE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL, metricsService);
   }
 
   @Test
@@ -77,6 +80,7 @@ class EventPublishServiceTest {
         EventPublishService.REQUEST_TABLE, TRAINEE_ID);
     assertThat("Unexpected header.", headers.get("message-group-id"),
         is(expectedMessageGroupId));
+    verify(metricsService).incrementResyncCounter();
   }
 
   @Test
@@ -104,5 +108,6 @@ class EventPublishServiceTest {
     assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
         is(USER_ID));
     assertThat("Unexpected producer.", headers.get("producer"), is("tis-trainee-user-management"));
+    verifyNoInteractions(metricsService);
   }
 }

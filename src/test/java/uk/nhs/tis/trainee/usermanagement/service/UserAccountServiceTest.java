@@ -31,9 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SMS;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.TOTP;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
@@ -56,6 +60,8 @@ import com.amazonaws.services.cognitoidp.model.EventContextDataType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
+import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
+import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
 import com.amazonaws.services.cognitoidp.model.UserStatusType;
@@ -73,6 +79,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
 class UserAccountServiceTest {
 
@@ -95,6 +102,7 @@ class UserAccountServiceTest {
   private AWSCognitoIdentityProvider cognitoIdp;
   private Cache cache;
   private EventPublishService eventPublishService;
+  private MetricsService metricsService;
 
   @BeforeEach
   void setUp() {
@@ -105,8 +113,10 @@ class UserAccountServiceTest {
     when(cacheManager.getCache("UserId")).thenReturn(cache);
 
     eventPublishService = mock(EventPublishService.class);
+    metricsService = mock(MetricsService.class);
 
-    service = new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager, eventPublishService);
+    service = spy(new UserAccountService(cognitoIdp, USER_POOL_ID, cacheManager,
+        eventPublishService, metricsService));
 
     // Initialize groups as an empty list instead of null, which reflects default AWS API behaviour.
     AdminListGroupsForUserResult mockGroupResult = new AdminListGroupsForUserResult();
@@ -370,6 +380,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
         new AdminSetUserMFAPreferenceResult());
+    when(service.getUserMfaType(USERNAME)).thenReturn(SMS);
 
     service.resetUserAccountMfa(USERNAME);
 
@@ -377,6 +388,7 @@ class UserAccountServiceTest {
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
     assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
     assertThat("Unexpected SMS enabled flag.", request.getSMSMfaSettings().getEnabled(), is(false));
+    verify(metricsService).incrementMfaResetCounter(any());
   }
 
   @Test
@@ -386,6 +398,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
         new AdminSetUserMFAPreferenceResult());
+    when(service.getUserMfaType(USERNAME)).thenReturn(TOTP);
 
     service.resetUserAccountMfa(USERNAME);
 
@@ -394,6 +407,7 @@ class UserAccountServiceTest {
     assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
     assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
         is(false));
+    verify(metricsService).incrementMfaResetCounter(TOTP);
   }
 
   @Test
@@ -404,11 +418,17 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminDeleteUser(requestCaptor.capture())).thenReturn(
         new AdminDeleteUserResult());
 
+    AdminGetUserResult getUserResult = new AdminGetUserResult();
+    getUserResult.setUserStatus(UserStatusType.CONFIRMED);
+    when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
+    when(service.getUserMfaType(any())).thenReturn(TOTP);
+
     service.deleteCognitoAccount(USERNAME);
 
     AdminDeleteUserRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
     assertThat("Unexpected delete account username.", request.getUsername(), is(USERNAME));
+    verify(metricsService).incrementDeleteAccountCounter(TOTP, UserStatusType.CONFIRMED);
   }
 
   @Test
@@ -689,5 +709,52 @@ class UserAccountServiceTest {
     service.getUserAccountIds(TRAINEE_ID_2);
 
     verify(cognitoIdp, times(1)).listUsers(any());
+  }
+
+  @Test
+  void shouldIdentifyTotpMfa() {
+    AdminSetUserMFAPreferenceRequest mfaRequest = getMockedMfaRequest(true, false);
+    when(service.getMfaPreferenceRequest(USERNAME)).thenReturn(mfaRequest);
+
+    MfaType mfaType = service.getUserMfaType(USERNAME);
+    assertThat("Unexpected MFA type.", mfaType, is(TOTP));
+  }
+
+  @Test
+  void shouldIdentifySmsMfa() {
+    AdminSetUserMFAPreferenceRequest mfaRequest = getMockedMfaRequest(false, true);
+    when(service.getMfaPreferenceRequest(USERNAME)).thenReturn(mfaRequest);
+
+    MfaType mfaType = service.getUserMfaType(USERNAME);
+    assertThat("Unexpected MFA type.", mfaType, is(SMS));
+  }
+
+  @Test
+  void shouldIdentifyNoMfa() {
+    AdminSetUserMFAPreferenceRequest mfaRequest = getMockedMfaRequest(false, false);
+    when(service.getMfaPreferenceRequest(USERNAME)).thenReturn(mfaRequest);
+
+    MfaType mfaType = service.getUserMfaType(USERNAME);
+    assertThat("Unexpected MFA type.", mfaType, is(NO_MFA));
+  }
+
+  /**
+   * Helper function to get a mocked AdminSetUserMFAPreferenceRequest.
+   *
+   * @param enableTotp Whether to enable TOTP MFA in the request.
+   * @param enableSms Whether to enable SMS MFA in the request.
+   *
+   * @return the mocked AdminSetUserMFAPreferenceRequest.
+   */
+  private AdminSetUserMFAPreferenceRequest getMockedMfaRequest(
+      boolean enableTotp, boolean enableSms) {
+    AdminSetUserMFAPreferenceRequest mfaRequest = mock(AdminSetUserMFAPreferenceRequest.class);
+    SoftwareTokenMfaSettingsType totpMfa = new SoftwareTokenMfaSettingsType();
+    totpMfa.setEnabled(enableTotp);
+    when(mfaRequest.getSoftwareTokenMfaSettings()).thenReturn(totpMfa);
+    SMSMfaSettingsType smsMfa = new SMSMfaSettingsType();
+    smsMfa.setEnabled(enableSms);
+    when(mfaRequest.getSMSMfaSettings()).thenReturn(smsMfa);
+    return mfaRequest;
   }
 }

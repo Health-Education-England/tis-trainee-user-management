@@ -42,6 +42,7 @@ import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
 import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
 import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
+import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import com.amazonaws.services.cognitoidp.model.UserType;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.time.Duration;
@@ -62,6 +63,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
 @Slf4j
 @Service
@@ -74,6 +76,8 @@ public class UserAccountService {
   private static final String NO_MFA = "NO_MFA";
   private static final Integer MAX_LOGIN_EVENTS = 10;
 
+  private final MetricsService metricsService;
+
   private final AWSCognitoIdentityProvider cognitoIdp;
   private final String userPoolId;
   private final Cache cache;
@@ -84,11 +88,13 @@ public class UserAccountService {
 
   UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
-      CacheManager cacheManager, EventPublishService eventPublishService) {
+      CacheManager cacheManager, EventPublishService eventPublishService,
+                     MetricsService metricsService) {
     this.cognitoIdp = cognitoIdp;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
     this.eventPublishService = eventPublishService;
+    this.metricsService = metricsService;
   }
 
   /**
@@ -264,9 +270,10 @@ public class UserAccountService {
    */
   public void resetUserAccountMfa(String username) {
     log.info("Resetting MFA for user '{}'.", username);
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
+    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
+
+    metricsService.incrementMfaResetCounter(getUserMfaType(username));
+
     request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
     request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
 
@@ -284,6 +291,10 @@ public class UserAccountService {
     AdminDeleteUserRequest request = new AdminDeleteUserRequest();
     request.setUserPoolId(userPoolId);
     request.setUsername(username);
+
+    MfaType oldMfaType = getUserMfaType(username);
+    UserStatusType userStatusType = getUserStatus(username);
+    metricsService.incrementDeleteAccountCounter(oldMfaType, userStatusType);
 
     cognitoIdp.adminDeleteUser(request);
     log.info("Deleted Cognito account for user '{}'.", username);
@@ -403,5 +414,36 @@ public class UserAccountService {
           ids.add(attr.get("sub"));
           cache.put(tisId, ids);
         });
+  }
+
+  protected MfaType getUserMfaType(String username) {
+    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
+
+    if (request.getSoftwareTokenMfaSettings() == null) {
+      //should not happen
+      return MfaType.NO_MFA;
+    }
+    if (Boolean.TRUE.equals(request.getSoftwareTokenMfaSettings().getEnabled())) {
+      return MfaType.TOTP;
+    }
+    if (Boolean.TRUE.equals(request.getSMSMfaSettings().getEnabled())) {
+      return MfaType.SMS;
+    }
+    return MfaType.NO_MFA;
+  }
+
+  protected AdminSetUserMFAPreferenceRequest getMfaPreferenceRequest(String username) {
+    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+    return request;
+  }
+
+  private UserStatusType getUserStatus(String username) {
+    AdminGetUserRequest request = new AdminGetUserRequest();
+    request.setUserPoolId(userPoolId);
+    request.setUsername(username);
+    AdminGetUserResult result = cognitoIdp.adminGetUser(request);
+    return UserStatusType.valueOf(result.getUserStatus());
   }
 }

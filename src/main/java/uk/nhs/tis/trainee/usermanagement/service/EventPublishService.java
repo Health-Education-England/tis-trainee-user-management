@@ -50,15 +50,18 @@ public class EventPublishService {
   private final QueueMessagingTemplate queueMessagingTemplate;
   private final String userAccountUpdateTopicArn;
   private final String queueUrl;
+  private final MetricsService metricsService;
 
   EventPublishService(NotificationMessagingTemplate notificationMessagingTemplate,
       @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
       QueueMessagingTemplate queueMessagingTemplate,
-      @Value("${application.aws.sqs.request}") String requestQueueUrl) {
+      @Value("${application.aws.sqs.request}") String requestQueueUrl,
+      MetricsService metricsService) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
     this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
     this.queueMessagingTemplate = queueMessagingTemplate;
     this.queueUrl = requestQueueUrl;
+    this.metricsService = metricsService;
   }
 
   /**
@@ -76,6 +79,8 @@ public class EventPublishService {
     headers.put("message-group-id", messageGroupId);
 
     queueMessagingTemplate.convertAndSend(queueUrl, dataRequestEvent, headers);
+
+    metricsService.incrementResyncCounter();
   }
 
   /**
