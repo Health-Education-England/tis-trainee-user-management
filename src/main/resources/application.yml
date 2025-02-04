@@ -11,7 +11,7 @@ application:
   aws:
     cognito:
       user-pool-id: ${COGNITO_USER_POOL_ID}
-      dsp-consultant-group: ${COGNITO_DSP_CONSULTANT_GROUP}
+      beta-participant-group: ${BETA_PARTICIPANT_GROUP}
     sns:
       user-account:
         update: ${USER_ACCOUNT_UPDATE_EVENT_TOPIC:}
