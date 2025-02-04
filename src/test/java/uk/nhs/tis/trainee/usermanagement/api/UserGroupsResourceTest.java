@@ -36,7 +36,7 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 class UserGroupsResourceTest {
 
   private static final String USERNAME = "username";
-  private static final String DSP_CONSULTANT_GROUP = "dsp-consultant-group";
+  private static final String BETA_PARTICIPANT_GROUP = "beta-participant-group";
 
   private MockMvc mockMvc;
   private UserAccountService service;
@@ -44,25 +44,25 @@ class UserGroupsResourceTest {
   @BeforeEach
   void setUp() {
     service = mock(UserAccountService.class);
-    UserGroupsResource resource = new UserGroupsResource(service, DSP_CONSULTANT_GROUP);
+    UserGroupsResource resource = new UserGroupsResource(service, BETA_PARTICIPANT_GROUP);
     mockMvc = MockMvcBuilders.standaloneSetup(resource).build();
   }
 
   @Test
-  void shouldEnrollDspConsultationGroup() throws Exception {
-    mockMvc.perform(post("/api/user-groups/dsp-consultants/enroll/{username}", USERNAME)
+  void shouldEnrollBetaParticipationGroup() throws Exception {
+    mockMvc.perform(post("/api/user-groups/beta-participants/enroll/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).enrollToUserGroup(USERNAME, DSP_CONSULTANT_GROUP);
+    verify(service).enrollToUserGroup(USERNAME, BETA_PARTICIPANT_GROUP);
   }
 
   @Test
-  void shouldWithdrawDspConsultation() throws Exception {
-    mockMvc.perform(post("/api/user-groups/dsp-consultants/withdraw/{username}", USERNAME)
+  void shouldWithdrawBetaParticipant() throws Exception {
+    mockMvc.perform(post("/api/user-groups/beta-participants/withdraw/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).withdrawFromUserGroup(USERNAME, DSP_CONSULTANT_GROUP);
+    verify(service).withdrawFromUserGroup(USERNAME, BETA_PARTICIPANT_GROUP);
   }
 }

@@ -41,37 +41,37 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 public class UserGroupsResource {
 
   private final UserAccountService service;
-  private final String dspConsultantGroupName;
+  private final String betaParticipantGroupName;
 
   UserGroupsResource(UserAccountService service,
-      @Value("${application.aws.cognito.dsp-consultant-group}") String dspConsultantGroupName) {
+      @Value("${application.aws.cognito.beta-participant-group}") String betaParticipantGroupName) {
     this.service = service;
-    this.dspConsultantGroupName = dspConsultantGroupName;
+    this.betaParticipantGroupName = betaParticipantGroupName;
   }
 
   /**
-   * Add the given user into DSP Beta consultation group.
+   * Add the given user into Beta Participant group.
    *
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/dsp-consultants/enroll/{username}")
-  ResponseEntity<Void> enrollDspConsultationGroup(@PathVariable String username) {
-    log.info("User '{}' enrollment to DSP Beta Consultation group requested.", username);
-    service.enrollToUserGroup(username, dspConsultantGroupName);
+  @PostMapping("/beta-participants/enroll/{username}")
+  ResponseEntity<Void> enrollBetaParticipantGroup(@PathVariable String username) {
+    log.info("User '{}' enrollment to Beta Participant group requested.", username);
+    service.enrollToUserGroup(username, betaParticipantGroupName);
     return ResponseEntity.noContent().build();
   }
 
   /**
-   * Remove the given user from DSP Beta consultation group.
+   * Remove the given user from Beta Participant group.
    *
    * @param username The username of the user.
    * @return 204 No Content, if successful.
    */
-  @PostMapping("/dsp-consultants/withdraw/{username}")
-  ResponseEntity<Void> withdrawDspConsultationGroup(@PathVariable String username) {
-    log.info("User '{}' withdrawal from DSP Beta Consultation group requested.", username);
-    service.withdrawFromUserGroup(username, dspConsultantGroupName);
+  @PostMapping("/beta-participants/withdraw/{username}")
+  ResponseEntity<Void> withdrawBetaParticipantGroup(@PathVariable String username) {
+    log.info("User '{}' withdrawal from Beta Participant group requested.", username);
+    service.withdrawFromUserGroup(username, betaParticipantGroupName);
     return ResponseEntity.noContent().build();
   }
 }

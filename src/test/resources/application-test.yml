@@ -2,7 +2,7 @@ application:
   aws:
     cognito:
       user-pool-id: eu-west-2_dummy
-      dsp-consultant-group: test_group
+      beta-participant-group: test_group
 
 cloud:
   aws:
