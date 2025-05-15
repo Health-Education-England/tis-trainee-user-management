@@ -61,8 +61,9 @@ public class ContactDetailsListener {
         service.updateEmail(accountId, dto.email());
       }
       default -> {
-        String message = String.format("%s accounts found for trainee %s, unable to update email.",
-            userAccountIds.size(), traineeId);
+        String message = String.format(
+            "%s accounts found for trainee %s, unable to update email. Found: [%s]",
+            userAccountIds.size(), traineeId, String.join(",", userAccountIds));
         throw new IllegalArgumentException(message);
       }
     }
