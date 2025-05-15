@@ -34,8 +34,7 @@ import org.springframework.stereotype.Component;
 public class AwsXrayInterceptor extends AbstractXRayInterceptor {
 
   @Override
-  @Pointcut(
-      "@within(com.amazonaws.xray.spring.aop.XRayEnabled) && (bean(*Resource) || bean(*Service))")
+  @Pointcut("@within(com.amazonaws.xray.spring.aop.XRayEnabled) && bean(*Resource)")
   public void xrayEnabledClasses() {
 
   }
