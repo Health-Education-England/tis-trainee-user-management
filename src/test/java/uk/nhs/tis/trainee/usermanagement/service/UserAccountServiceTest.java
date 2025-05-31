@@ -92,10 +92,16 @@ class UserAccountServiceTest {
   private static final String TRAINEE_ID_2 = UUID.randomUUID().toString();
   private static final String USER_ID_1 = UUID.randomUUID().toString();
   private static final String USER_ID_2 = UUID.randomUUID().toString();
+  private static final String FORENAMES_1 = "forenames-one";
+  private static final String FORENAMES_2 = "forenames-two";
+  private static final String SURNAME_1 = "surname-one";
+  private static final String SURNAME_2 = "surname-two";
 
   private static final String ATTRIBUTE_TRAINEE_ID = "custom:tisId";
   private static final String ATTRIBUTE_USER_ID = "sub";
   private static final String ATTRIBUTE_EMAIL = "email";
+  private static final String ATTRIBUTE_FAMILY_NAME = "family_name";
+  private static final String ATTRIBUTE_GIVEN_NAME = "given_name";
   private static final String ATTRIBUTE_EMAIL_VERIFIED = "email_verified";
 
   private UserAccountService service;
@@ -282,13 +288,13 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
 
-    assertThrows(IllegalArgumentException.class, () -> service.updateEmail(USER_ID_1, newEmail));
+    assertThrows(IllegalArgumentException.class, () -> service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1));
 
     verify(cognitoIdp, never()).adminUpdateUserAttributes(any());
   }
 
   @Test
-  void shouldNotUpdateEmailWhenTheEmailHasNotChanged() {
+  void shouldOnlyUpdateNamesWhenTheEmailHasNotChanged() {
     String newEmail = "new.email@example.com";
 
     AdminGetUserResult getUserResult = new AdminGetUserResult();
@@ -296,13 +302,31 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
 
-    service.updateEmail(USER_ID_1, newEmail);
+    service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_2, SURNAME_2);
 
-    verify(cognitoIdp, never()).adminUpdateUserAttributes(any());
+    ArgumentCaptor<AdminUpdateUserAttributesRequest> updateRequestCaptor = ArgumentCaptor.forClass(
+        AdminUpdateUserAttributesRequest.class);
+    verify(cognitoIdp).adminUpdateUserAttributes(updateRequestCaptor.capture());
+
+    AdminUpdateUserAttributesRequest updateRequest = updateRequestCaptor.getValue();
+
+    assertThat("Unexpected user pool.", updateRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected user ID.", updateRequest.getUsername(), is(USER_ID_1));
+
+    List<AttributeType> userAttributes = updateRequest.getUserAttributes();
+    assertThat("Unexpected attribute count.", userAttributes.size(), is(2));
+
+    AttributeType userAttribute = userAttributes.get(0);
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_FAMILY_NAME));
+    assertThat("Unexpected attribute value.", userAttribute.getValue(), is(SURNAME_2));
+
+    userAttribute = userAttributes.get(1);
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_GIVEN_NAME));
+    assertThat("Unexpected attribute value.", userAttribute.getValue(), is(FORENAMES_2));
   }
 
   @Test
-  void shouldUpdateEmailWhenNewEmailNotExistsInUserPool() {
+  void shouldUpdateEmailAndNamesWhenNewEmailNotExistsInUserPool() {
     String newEmail = "new.email@example.com";
 
     ArgumentCaptor<AdminGetUserRequest> getRequestCaptor = ArgumentCaptor.forClass(
@@ -316,7 +340,7 @@ class UserAccountServiceTest {
             )
         );
 
-    service.updateEmail(USER_ID_1, newEmail);
+    service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_2, SURNAME_2);
 
     List<AdminGetUserRequest> getRequests = getRequestCaptor.getAllValues();
     assertThat("Unexpected get request count.", getRequests.size(), is(2));
@@ -334,13 +358,21 @@ class UserAccountServiceTest {
     assertThat("Unexpected user ID.", updateRequest.getUsername(), is(USER_ID_1));
 
     List<AttributeType> userAttributes = updateRequest.getUserAttributes();
-    assertThat("Unexpected attribute count.", userAttributes.size(), is(2));
+    assertThat("Unexpected attribute count.", userAttributes.size(), is(4));
 
     AttributeType userAttribute = userAttributes.get(0);
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_FAMILY_NAME));
+    assertThat("Unexpected attribute value.", userAttribute.getValue(), is(SURNAME_2));
+
+    userAttribute = userAttributes.get(1);
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_GIVEN_NAME));
+    assertThat("Unexpected attribute value.", userAttribute.getValue(), is(FORENAMES_2));
+
+    userAttribute = userAttributes.get(2);
     assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_EMAIL));
     assertThat("Unexpected attribute value.", userAttribute.getValue(), is(newEmail));
 
-    userAttribute = userAttributes.get(1);
+    userAttribute = userAttributes.get(3);
     assertThat("Unexpected attribute name.", userAttribute.getName(), is(ATTRIBUTE_EMAIL_VERIFIED));
     assertThat("Unexpected attribute value.", userAttribute.getValue(), is("true"));
   }
@@ -361,7 +393,7 @@ class UserAccountServiceTest {
             )
         );
 
-    service.updateEmail(USER_ID_1, newEmail);
+    service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1);
 
     List<AdminGetUserRequest> getRequests = getRequestCaptor.getAllValues();
     assertThat("Unexpected get request count.", getRequests.size(), is(2));

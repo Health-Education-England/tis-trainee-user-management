@@ -58,11 +58,11 @@ public class ContactDetailsListener {
       case 0 -> log.info("No account exists for trainee {}, skipping username update.", traineeId);
       case 1 -> {
         String accountId = userAccountIds.iterator().next();
-        service.updateEmail(accountId, dto.email());
+        service.updateContactDetails(accountId, dto.email(), dto.forenames(), dto.surname());
       }
       default -> {
         String message = String.format(
-            "%s accounts found for trainee %s, unable to update email. Found: [%s]",
+            "%s accounts found for trainee %s, unable to update contact details. Found: [%s]",
             userAccountIds.size(), traineeId, String.join(",", userAccountIds));
         throw new IllegalArgumentException(message);
       }

@@ -131,13 +131,19 @@ public class UserAccountService {
   }
 
   /**
-   * Update the email for the given user account.
+   * Update the Contact Details for the given user account.
    *
    * @param userId   The ID of the user account.
    * @param newEmail The new email to be used.
+   * @param forenames The new forenames to be used.
+   * @param surname The new surname to be used.
    */
-  public void updateEmail(String userId, String newEmail) {
+  public void updateContactDetails(String userId, String newEmail, String forenames, String surname) {
     log.info("Updating email to '{}' for user '{}'.", newEmail, userId);
+
+    List<AttributeType> attributeTypes = new ArrayList<>();
+    attributeTypes.add(new AttributeType().withName("family_name").withValue(surname));
+    attributeTypes.add(new AttributeType().withName("given_name").withValue(forenames));
 
     try {
       // Verify that the new email is not already used.
@@ -148,7 +154,8 @@ public class UserAccountService {
       String existingUserId = result.getUsername();
 
       if (existingUserId.equals(userId)) {
-        log.info("The email for this user has not changed, skipping update.");
+        updateCognitoContactDetails(userId, attributeTypes);
+        log.info("The email for this user has not changed, skipping email update.");
       } else {
         String message = String.format("The email '%s' is already in use by user '%s'.", newEmail,
             existingUserId);
@@ -169,16 +176,10 @@ public class UserAccountService {
           .map(AttributeType::getValue)
           .findFirst();
 
-      AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest();
-      updateRequest.setUserPoolId(userPoolId);
-      updateRequest.setUsername(userId);
+      attributeTypes.add(new AttributeType().withName("email").withValue(newEmail));
+      attributeTypes.add(new AttributeType().withName("email_verified").withValue("true"));
+      updateCognitoContactDetails(userId, attributeTypes);
 
-      updateRequest.setUserAttributes(List.of(
-          new AttributeType().withName("email").withValue(newEmail),
-          new AttributeType().withName("email_verified").withValue("true")
-      ));
-
-      cognitoIdp.adminUpdateUserAttributes(updateRequest);
       eventPublishService.publishEmailUpdateEvent(userId, traineeId.orElse(null),
           existingEmail.orElse(null), newEmail);
       log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
@@ -445,5 +446,21 @@ public class UserAccountService {
     request.setUsername(username);
     AdminGetUserResult result = cognitoIdp.adminGetUser(request);
     return UserStatusType.valueOf(result.getUserStatus());
+  }
+
+  /**
+   * Update the Contact Details on Cognito for the given user account.
+   *
+   * @param userId   The ID of the user account.
+   * @param attributeTypes The attributes to update
+   */
+  private void updateCognitoContactDetails(String userId, List<AttributeType> attributeTypes) {
+    AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest();
+    updateRequest.setUserPoolId(userPoolId);
+    updateRequest.setUsername(userId);
+
+    updateRequest.setUserAttributes(attributeTypes);
+    cognitoIdp.adminUpdateUserAttributes(updateRequest);
+    log.info("Contact details updated for user '{}'.", userId);
   }
 }
