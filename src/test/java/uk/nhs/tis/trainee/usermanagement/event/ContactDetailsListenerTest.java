@@ -42,6 +42,8 @@ class ContactDetailsListenerTest {
   private static final String ACCOUNT_ID = UUID.randomUUID().toString();
   private static final String TRAINEE_ID = UUID.randomUUID().toString();
   private static final String EMAIL = "unit.test@example.com";
+  private static final String FORENAMES = "Fore Name";
+  private static final String SURNAME = "Surname";
 
   private ContactDetailsListener listener;
   private UserAccountService service;
@@ -74,7 +76,7 @@ class ContactDetailsListenerTest {
 
     listener.handleContactDetailsUpdate(event);
 
-    verify(service, never()).updateEmail(any(), any());
+    verify(service, never()).updateContactDetails(any(), any(), any(), any());
   }
 
   @Test
@@ -94,7 +96,7 @@ class ContactDetailsListenerTest {
 
     assertThrows(IllegalArgumentException.class, () -> listener.handleContactDetailsUpdate(event));
 
-    verify(service, never()).updateEmail(any(), any());
+    verify(service, never()).updateContactDetails(any(), any(), any(), any());
   }
 
   @Test
@@ -104,16 +106,18 @@ class ContactDetailsListenerTest {
           "record": {
             "data": {
               "id": "%s",
-              "email": "%s"
+              "email": "%s",
+              "forenames": "%s",
+              "surname": "%s"
             }
           }
-        }""".formatted(TRAINEE_ID, EMAIL);
+        }""".formatted(TRAINEE_ID, EMAIL, FORENAMES, SURNAME);
     ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
 
     when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(Set.of(ACCOUNT_ID));
 
     listener.handleContactDetailsUpdate(event);
 
-    verify(service).updateEmail(ACCOUNT_ID, EMAIL);
+    verify(service).updateContactDetails(ACCOUNT_ID, EMAIL, FORENAMES, SURNAME);
   }
 }

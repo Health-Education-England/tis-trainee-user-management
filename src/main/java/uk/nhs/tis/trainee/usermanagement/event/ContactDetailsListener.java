@@ -58,7 +58,7 @@ public class ContactDetailsListener {
       case 0 -> log.info("No account exists for trainee {}, skipping username update.", traineeId);
       case 1 -> {
         String accountId = userAccountIds.iterator().next();
-        service.updateEmail(accountId, dto.email());
+        service.updateContactDetails(accountId, dto.email(), dto.forenames(), dto.surname());
       }
       default -> {
         String message = String.format(
