@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,8 @@ class ContactDetailsListenerTest {
   }
 
   @Test
-  void shouldThrowExceptionWhenMultipleAccountFoundForUpdate() throws JsonProcessingException {
+  void shouldThrowExceptionWhenMultipleAccountFoundForUpdateAndDeDupeFails()
+      throws JsonProcessingException {
     String eventJson = """
         {
           "record": {
@@ -92,11 +94,40 @@ class ContactDetailsListenerTest {
         }""".formatted(TRAINEE_ID, EMAIL);
     ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
 
-    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(Set.of(ACCOUNT_ID, "123"));
+    Set<String> accountIds = Set.of(ACCOUNT_ID, "123");
+    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(accountIds);
+    when(service.deleteDuplicateAccounts(TRAINEE_ID, accountIds, EMAIL))
+        .thenReturn(Optional.empty());
 
     assertThrows(IllegalArgumentException.class, () -> listener.handleContactDetailsUpdate(event));
 
     verify(service, never()).updateContactDetails(any(), any(), any(), any());
+  }
+
+  @Test
+  void shouldUpdateUsernameWhenMultipleAccountFoundForUpdateAndDeDupeSuccessful()
+      throws JsonProcessingException {
+    String eventJson = """
+        {
+          "record": {
+            "data": {
+              "id": "%s",
+              "email": "%s",
+              "forenames": "%s",
+              "surname": "%s"
+            }
+          }
+        }""".formatted(TRAINEE_ID, EMAIL, FORENAMES, SURNAME);
+    ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
+
+    Set<String> accountIds = Set.of(ACCOUNT_ID, "123");
+    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(accountIds);
+    when(service.deleteDuplicateAccounts(TRAINEE_ID, accountIds, EMAIL))
+        .thenReturn(Optional.of(ACCOUNT_ID));
+
+    listener.handleContactDetailsUpdate(event);
+
+    verify(service).updateContactDetails(ACCOUNT_ID, EMAIL, FORENAMES, SURNAME);
   }
 
   @Test

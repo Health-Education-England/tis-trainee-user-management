@@ -74,8 +74,8 @@ class UserAccountResourceTest {
 
   @Test
   void shouldReturnExistenceFalseWhenUserAccountNotExists() throws Exception {
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("NO_ACCOUNT", "NO_ACCOUNT",
-        List.of(), null);
+    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto(USERNAME, "NO_ACCOUNT",
+        "NO_ACCOUNT", List.of(), null);
 
     when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
 
@@ -88,7 +88,7 @@ class UserAccountResourceTest {
 
   @Test
   void shouldReturnExistenceTrueWhenUserAccountExists() throws Exception {
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
+    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto(USERNAME, "MFA_STATUS",
         "USER_STATUS", List.of(), Instant.now());
 
     when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
@@ -104,7 +104,7 @@ class UserAccountResourceTest {
   void shouldGetUserAccountDetails() throws Exception {
     List<String> groups = List.of("GROUP_1", "GROUP_2");
     Instant accountCreated = Instant.now();
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto("MFA_STATUS",
+    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto(USERNAME, "MFA_STATUS",
         "USER_STATUS", groups, accountCreated);
 
     when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
@@ -112,6 +112,7 @@ class UserAccountResourceTest {
     mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.username").value(USERNAME))
         .andExpect(jsonPath("$.mfaStatus").value("MFA_STATUS"))
         .andExpect(jsonPath("$.userStatus").value("USER_STATUS"))
         .andExpect(jsonPath("$.groups").isArray())

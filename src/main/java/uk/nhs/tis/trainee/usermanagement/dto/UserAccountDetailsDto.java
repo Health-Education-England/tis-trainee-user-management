@@ -28,6 +28,7 @@ import lombok.Value;
 @Value
 public class UserAccountDetailsDto {
 
+  String username;
   String mfaStatus;
   String userStatus;
   List<String> groups;

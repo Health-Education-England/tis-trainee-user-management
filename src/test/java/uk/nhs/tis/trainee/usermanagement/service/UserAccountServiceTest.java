@@ -27,6 +27,7 @@ import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -47,6 +48,7 @@ import com.amazonaws.services.cognitoidp.model.AdminDeleteUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
+import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsRequest;
 import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupResult;
@@ -57,6 +59,8 @@ import com.amazonaws.services.cognitoidp.model.AttributeType;
 import com.amazonaws.services.cognitoidp.model.AuthEventType;
 import com.amazonaws.services.cognitoidp.model.ChallengeResponseType;
 import com.amazonaws.services.cognitoidp.model.EventContextDataType;
+import com.amazonaws.services.cognitoidp.model.EventResponseType;
+import com.amazonaws.services.cognitoidp.model.EventType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
@@ -70,8 +74,10 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -84,7 +90,7 @@ import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 class UserAccountServiceTest {
 
   private static final String USER_POOL_ID = "region_abc213";
-  private static final String USERNAME = "joe.bloggs@fake.email";
+  private static final String EMAIL = "joe.bloggs@fake.email";
   private static final String GROUP_1 = "user-group-one";
   private static final String GROUP_2 = "user-group-two";
 
@@ -92,6 +98,8 @@ class UserAccountServiceTest {
   private static final String TRAINEE_ID_2 = UUID.randomUUID().toString();
   private static final String USER_ID_1 = UUID.randomUUID().toString();
   private static final String USER_ID_2 = UUID.randomUUID().toString();
+  private static final String USER_ID_3 = UUID.randomUUID().toString();
+
   private static final String FORENAMES_1 = "forenames-one";
   private static final String FORENAMES_2 = "forenames-two";
   private static final String SURNAME_1 = "surname-one";
@@ -134,7 +142,7 @@ class UserAccountServiceTest {
   void shouldReturnNoAccountDetailsWhenUserNotFoundGettingUser() {
     when(cognitoIdp.adminGetUser(any())).thenThrow(UserNotFoundException.class);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), is("NO_ACCOUNT"));
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(), is("NO_ACCOUNT"));
     assertThat("Unexpected user groups size.", userAccountDetails.getGroups().size(), is(0));
@@ -146,7 +154,7 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminGetUser(any())).thenReturn(new AdminGetUserResult());
     when(cognitoIdp.adminListGroupsForUser(any())).thenThrow(UserNotFoundException.class);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), not("NO_ACCOUNT"));
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(), not("NO_ACCOUNT"));
     assertThat("Unexpected user groups size.", userAccountDetails.getGroups().size(), is(0));
@@ -160,7 +168,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected account created.", userAccountDetails.getAccountCreated(),
         nullValue());
   }
@@ -174,7 +182,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected account created.", userAccountDetails.getAccountCreated(),
         is(createdAtWithDatePrecision));
   }
@@ -186,7 +194,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(),
         is(UserStatusType.CONFIRMED.toString()));
   }
@@ -198,7 +206,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(),
         is(UserStatusType.UNCONFIRMED.toString()));
   }
@@ -211,7 +219,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected user status.", userAccountDetails.getUserStatus(),
         is(UserStatusType.FORCE_CHANGE_PASSWORD.toString()));
   }
@@ -222,7 +230,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), is("NO_MFA"));
   }
 
@@ -233,7 +241,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     assertThat("Unexpected MFA status.", userAccountDetails.getMfaStatus(), is("PREFERRED_MFA"));
   }
 
@@ -242,7 +250,7 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminGetUser(any())).thenReturn(new AdminGetUserResult());
     when(cognitoIdp.adminListGroupsForUser(any())).thenThrow(UserNotFoundException.class);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     List<String> groups = userAccountDetails.getGroups();
     assertThat("Unexpected user groups.", groups, notNullValue());
     assertThat("Unexpected user groups.", groups.size(), is(0));
@@ -256,7 +264,7 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminGetUser(any())).thenReturn(new AdminGetUserResult());
     when(cognitoIdp.adminListGroupsForUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     List<String> groups = userAccountDetails.getGroups();
     assertThat("Unexpected user groups.", groups, notNullValue());
     assertThat("Unexpected user groups.", groups.size(), is(0));
@@ -272,7 +280,7 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminGetUser(any())).thenReturn(new AdminGetUserResult());
     when(cognitoIdp.adminListGroupsForUser(any())).thenReturn(result);
 
-    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(USERNAME);
+    UserAccountDetailsDto userAccountDetails = service.getUserAccountDetails(EMAIL);
     List<String> groups = userAccountDetails.getGroups();
     assertThat("Unexpected user groups.", groups, notNullValue());
     assertThat("Unexpected user groups.", groups.size(), is(2));
@@ -288,7 +296,8 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
 
-    assertThrows(IllegalArgumentException.class, () -> service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1));
+    assertThrows(IllegalArgumentException.class,
+        () -> service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1));
 
     verify(cognitoIdp, never()).adminUpdateUserAttributes(any());
   }
@@ -412,13 +421,13 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
         new AdminSetUserMFAPreferenceResult());
-    when(service.getUserMfaType(USERNAME)).thenReturn(SMS);
+    when(service.getUserMfaType(EMAIL)).thenReturn(SMS);
 
-    service.resetUserAccountMfa(USERNAME);
+    service.resetUserAccountMfa(EMAIL);
 
     AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
+    assertThat("Unexpected username.", request.getUsername(), is(EMAIL));
     assertThat("Unexpected SMS enabled flag.", request.getSMSMfaSettings().getEnabled(), is(false));
     verify(metricsService).incrementMfaResetCounter(any());
   }
@@ -430,13 +439,13 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
         new AdminSetUserMFAPreferenceResult());
-    when(service.getUserMfaType(USERNAME)).thenReturn(TOTP);
+    when(service.getUserMfaType(EMAIL)).thenReturn(TOTP);
 
-    service.resetUserAccountMfa(USERNAME);
+    service.resetUserAccountMfa(EMAIL);
 
     AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
+    assertThat("Unexpected username.", request.getUsername(), is(EMAIL));
     assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
         is(false));
     verify(metricsService).incrementMfaResetCounter(TOTP);
@@ -455,12 +464,194 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
     when(service.getUserMfaType(any())).thenReturn(TOTP);
 
-    service.deleteCognitoAccount(USERNAME);
+    service.deleteCognitoAccount(EMAIL);
 
     AdminDeleteUserRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected delete account username.", request.getUsername(), is(USERNAME));
+    assertThat("Unexpected delete account username.", request.getUsername(), is(EMAIL));
     verify(metricsService).incrementDeleteAccountCounter(TOTP, UserStatusType.CONFIRMED);
+  }
+
+  @Test
+  void shouldGetAccountByCurrentEmailWhenDeletingDuplicates() {
+    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
+        AdminGetUserRequest.class);
+    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
+      AdminGetUserRequest request = inv.getArgument(0);
+      boolean isGetByEmail = request.getUsername().equals(EMAIL);
+      String username = isGetByEmail ? USER_ID_1 : request.getUsername();
+      String email = isGetByEmail ? EMAIL : "no-match@example.com";
+
+      return new AdminGetUserResult()
+          .withUsername(username)
+          .withUserAttributes(
+              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(email),
+              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+          )
+          .withUserStatus(UserStatusType.CONFIRMED);
+    });
+
+    service.deleteDuplicateAccounts(TRAINEE_ID_1, Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
+
+    AdminGetUserRequest getUserRequest = getUserCaptor.getAllValues().get(0);
+    assertThat("Unexpected user pool.", getUserRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected get user username.", getUserRequest.getUsername(), is(EMAIL));
+  }
+
+  @Test
+  void shouldDeleteDuplicatesWhenTisEmailMatches() {
+    when(cognitoIdp.adminGetUser(any())).thenAnswer(inv -> {
+      AdminGetUserRequest request = inv.getArgument(0);
+      boolean isGetByEmail = request.getUsername().equals(EMAIL);
+      String username = isGetByEmail ? USER_ID_1 : request.getUsername();
+      String email = isGetByEmail ? EMAIL : "no-match@example.com";
+
+      return new AdminGetUserResult()
+          .withUsername(username)
+          .withUserAttributes(
+              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(email),
+              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+          )
+          .withUserStatus(UserStatusType.CONFIRMED);
+    });
+
+    Optional<String> accountId = service.deleteDuplicateAccounts(TRAINEE_ID_1,
+        Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
+
+    assertThat("Unexpected remaining account.", accountId, is(Optional.of(USER_ID_1)));
+
+    ArgumentCaptor<AdminDeleteUserRequest> deleteUserCaptor = ArgumentCaptor.forClass(
+        AdminDeleteUserRequest.class);
+    verify(cognitoIdp, times(2)).adminDeleteUser(deleteUserCaptor.capture());
+
+    List<AdminDeleteUserRequest> deleteUserRequests = deleteUserCaptor.getAllValues();
+    assertThat("Unexpected request count.", deleteUserRequests, hasSize(2));
+
+    Set<String> deletedIds = deleteUserRequests.stream()
+        .peek(request -> {
+          assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
+        })
+        .map(AdminDeleteUserRequest::getUsername)
+        .collect(Collectors.toSet());
+    assertThat("Unexpected deleted account count.", deletedIds, hasSize(2));
+    assertThat("Unexpected deleted account.", deletedIds, hasItems(USER_ID_2, USER_ID_3));
+
+    verify(metricsService, times(2)).incrementDeleteAccountCounter(any(), any());
+  }
+
+  @Test
+  void shouldNotDeleteDuplicatesWhenTisEmailNotMatchesAndNoSuccessfulAuth() {
+    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
+        AdminGetUserRequest.class);
+    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
+      AdminGetUserRequest request = inv.getArgument(0);
+      String username = request.getUsername().equals(EMAIL) ? UUID.randomUUID().toString()
+          : request.getUsername();
+
+      return new AdminGetUserResult()
+          .withUsername(username)
+          .withUserAttributes(
+              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue("no-match@example.com"),
+              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+          )
+          .withUserStatus(UserStatusType.CONFIRMED);
+    });
+
+    when(cognitoIdp.adminListUserAuthEvents(any())).thenReturn(
+        new AdminListUserAuthEventsResult()
+            .withAuthEvents(List.of())
+    );
+
+    Optional<String> accountId = service.deleteDuplicateAccounts(TRAINEE_ID_1,
+        Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
+
+    assertThat("Unexpected remaining account.", accountId, is(Optional.empty()));
+
+    AdminGetUserRequest getUserRequest = getUserCaptor.getAllValues().get(0);
+    assertThat("Unexpected user pool.", getUserRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected get user username.", getUserRequest.getUsername(), is(EMAIL));
+
+    verify(cognitoIdp, times(0)).adminDeleteUser(any());
+    verify(metricsService, times(0)).incrementDeleteAccountCounter(any(), any());
+  }
+
+  @Test
+  void shouldNotDeleteDuplicatesWhenTisEmailNotMatchesAndSuccessfulAuth() {
+    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
+        AdminGetUserRequest.class);
+    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
+      AdminGetUserRequest request = inv.getArgument(0);
+      String username = request.getUsername().equals(EMAIL) ? UUID.randomUUID().toString()
+          : request.getUsername();
+
+      return new AdminGetUserResult()
+          .withUsername(username)
+          .withUserAttributes(
+              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue("no-match@example.com"),
+              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+          )
+          .withUserStatus(UserStatusType.CONFIRMED);
+    });
+
+    when(cognitoIdp.adminListUserAuthEvents(any())).thenReturn(
+        new AdminListUserAuthEventsResult()
+            .withAuthEvents(List.of(
+                new AuthEventType()
+                    .withCreationDate(Date.from(Instant.now()))
+                    .withEventType(EventType.SignIn)
+                    .withEventResponse(EventResponseType.Pass)
+            ))
+    );
+
+    Optional<String> accountId = service.deleteDuplicateAccounts(TRAINEE_ID_1,
+        Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
+
+    assertThat("Unexpected remaining account.", accountId, is(Optional.empty()));
+
+    AdminGetUserRequest getUserRequest = getUserCaptor.getAllValues().get(0);
+    assertThat("Unexpected user pool.", getUserRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected get user username.", getUserRequest.getUsername(), is(EMAIL));
+
+    verify(cognitoIdp, times(0)).adminDeleteUser(any());
+    verify(metricsService, times(0)).incrementDeleteAccountCounter(any(), any());
+  }
+
+  @Test
+  void shouldRetryPaginatingThroughAuthEventsWhenRateLimitedGettingAuthEvents() {
+    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
+        AdminGetUserRequest.class);
+    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
+      AdminGetUserRequest request = inv.getArgument(0);
+      String username = request.getUsername().equals(EMAIL) ? UUID.randomUUID().toString()
+          : request.getUsername();
+
+      return new AdminGetUserResult()
+          .withUsername(username)
+          .withUserAttributes(
+              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue("no-match@example.com"),
+              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+          )
+          .withUserStatus(UserStatusType.CONFIRMED);
+    });
+
+    ArgumentCaptor<AdminListUserAuthEventsRequest> authEventCaptor = ArgumentCaptor.forClass(
+        AdminListUserAuthEventsRequest.class);
+    when(cognitoIdp.adminListUserAuthEvents(authEventCaptor.capture()))
+        .thenReturn(new AdminListUserAuthEventsResult().withAuthEvents(List.of())
+            .withNextToken("tokenforpage2"))
+        .thenThrow(TooManyRequestsException.class)
+        .thenReturn(new AdminListUserAuthEventsResult().withAuthEvents(List.of()));
+
+    service.deleteDuplicateAccounts(TRAINEE_ID_1, Set.of(USER_ID_1), EMAIL);
+
+    List<AdminListUserAuthEventsRequest> requests = authEventCaptor.getAllValues();
+    assertThat("Unexpected request count.", requests, hasSize(3));
+    AdminListUserAuthEventsRequest request1 = requests.get(0);
+    assertThat("Unexpected pagination token.", request1.getNextToken(), nullValue());
+    AdminListUserAuthEventsRequest request2 = requests.get(1);
+    assertThat("Unexpected pagination token.", request2.getNextToken(), is("tokenforpage2"));
+    AdminListUserAuthEventsRequest request3 = requests.get(2);
+    assertThat("Unexpected pagination token.", request3.getNextToken(), is("tokenforpage2"));
   }
 
   @Test
@@ -471,11 +662,11 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminAddUserToGroup(requestCaptor.capture())).thenReturn(
         new AdminAddUserToGroupResult());
 
-    service.enrollToUserGroup(USERNAME, GROUP_1);
+    service.enrollToUserGroup(EMAIL, GROUP_1);
 
     AdminAddUserToGroupRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
+    assertThat("Unexpected username.", request.getUsername(), is(EMAIL));
     assertThat("Unexpected user group.", request.getGroupName(), is(GROUP_1));
   }
 
@@ -487,11 +678,11 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminRemoveUserFromGroup(requestCaptor.capture())).thenReturn(
         new AdminRemoveUserFromGroupResult());
 
-    service.withdrawFromUserGroup(USERNAME, GROUP_1);
+    service.withdrawFromUserGroup(EMAIL, GROUP_1);
 
     AdminRemoveUserFromGroupRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.getUsername(), is(USERNAME));
+    assertThat("Unexpected username.", request.getUsername(), is(EMAIL));
     assertThat("Unexpected user group.", request.getGroupName(), is(GROUP_1));
   }
 
@@ -499,7 +690,7 @@ class UserAccountServiceTest {
   void shouldReturnNoLoginsWhenUserNotFoundGettingUserLogins() {
     when(cognitoIdp.adminListUserAuthEvents(any())).thenThrow(UserNotFoundException.class);
 
-    List<UserLoginDetailsDto> userLoginDetails = service.getUserLoginDetails(USERNAME);
+    List<UserLoginDetailsDto> userLoginDetails = service.getUserLoginDetails(EMAIL);
     assertThat("Unexpected logins.", userLoginDetails.size(), is(0));
   }
 
@@ -547,7 +738,7 @@ class UserAccountServiceTest {
 
     when(cognitoIdp.adminListUserAuthEvents(any())).thenReturn(result);
 
-    List<UserLoginDetailsDto> userLogins = service.getUserLoginDetails(USERNAME);
+    List<UserLoginDetailsDto> userLogins = service.getUserLoginDetails(EMAIL);
 
     assertThat("Unexpected logins count.", userLogins.size(), is(2));
 
@@ -746,27 +937,27 @@ class UserAccountServiceTest {
   @Test
   void shouldIdentifyTotpMfa() {
     AdminSetUserMFAPreferenceRequest mfaRequest = getMockedMfaRequest(true, false);
-    when(service.getMfaPreferenceRequest(USERNAME)).thenReturn(mfaRequest);
+    when(service.getMfaPreferenceRequest(EMAIL)).thenReturn(mfaRequest);
 
-    MfaType mfaType = service.getUserMfaType(USERNAME);
+    MfaType mfaType = service.getUserMfaType(EMAIL);
     assertThat("Unexpected MFA type.", mfaType, is(TOTP));
   }
 
   @Test
   void shouldIdentifySmsMfa() {
     AdminSetUserMFAPreferenceRequest mfaRequest = getMockedMfaRequest(false, true);
-    when(service.getMfaPreferenceRequest(USERNAME)).thenReturn(mfaRequest);
+    when(service.getMfaPreferenceRequest(EMAIL)).thenReturn(mfaRequest);
 
-    MfaType mfaType = service.getUserMfaType(USERNAME);
+    MfaType mfaType = service.getUserMfaType(EMAIL);
     assertThat("Unexpected MFA type.", mfaType, is(SMS));
   }
 
   @Test
   void shouldIdentifyNoMfa() {
     AdminSetUserMFAPreferenceRequest mfaRequest = getMockedMfaRequest(false, false);
-    when(service.getMfaPreferenceRequest(USERNAME)).thenReturn(mfaRequest);
+    when(service.getMfaPreferenceRequest(EMAIL)).thenReturn(mfaRequest);
 
-    MfaType mfaType = service.getUserMfaType(USERNAME);
+    MfaType mfaType = service.getUserMfaType(EMAIL);
     assertThat("Unexpected MFA type.", mfaType, is(NO_MFA));
   }
 
@@ -774,8 +965,7 @@ class UserAccountServiceTest {
    * Helper function to get a mocked AdminSetUserMFAPreferenceRequest.
    *
    * @param enableTotp Whether to enable TOTP MFA in the request.
-   * @param enableSms Whether to enable SMS MFA in the request.
-   *
+   * @param enableSms  Whether to enable SMS MFA in the request.
    * @return the mocked AdminSetUserMFAPreferenceRequest.
    */
   private AdminSetUserMFAPreferenceRequest getMockedMfaRequest(

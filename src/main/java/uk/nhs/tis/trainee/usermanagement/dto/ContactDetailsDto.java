@@ -33,7 +33,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param surname   The new surname from the contact details.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record ContactDetailsDto(@JsonAlias("id")
-  String traineeId, String email, String forenames, String surname) {
+public record ContactDetailsDto(
+    @JsonAlias("id")
+    String traineeId,
+    String email,
+    String forenames,
+    String surname) {
 
 }
