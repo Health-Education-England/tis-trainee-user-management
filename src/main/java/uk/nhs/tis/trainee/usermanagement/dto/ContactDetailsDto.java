@@ -29,8 +29,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * @param traineeId The trainee ID associated with the contact details.
  * @param email     The email address from the contact details.
+ * @param forenames The new forenames from the contact details.
+ * @param surname   The new surname from the contact details.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record ContactDetailsDto(@JsonAlias("id") String traineeId, String email) {
+public record ContactDetailsDto(@JsonAlias("id")
+  String traineeId, String email, String forenames, String surname) {
 
 }
