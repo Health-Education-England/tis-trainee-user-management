@@ -35,6 +35,8 @@ import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
 import com.amazonaws.services.cognitoidp.model.AdminUpdateUserAttributesRequest;
 import com.amazonaws.services.cognitoidp.model.AttributeType;
 import com.amazonaws.services.cognitoidp.model.AuthEventType;
+import com.amazonaws.services.cognitoidp.model.EventResponseType;
+import com.amazonaws.services.cognitoidp.model.EventType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
@@ -89,7 +91,7 @@ public class UserAccountService {
   UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
       CacheManager cacheManager, EventPublishService eventPublishService,
-                     MetricsService metricsService) {
+      MetricsService metricsService) {
     this.cognitoIdp = cognitoIdp;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
@@ -120,11 +122,11 @@ public class UserAccountService {
       if (result.getUserCreateDate() != null) {
         createdAt = result.getUserCreateDate().toInstant();
       }
-      userAccountDetails = new UserAccountDetailsDto(mfaStatus, result.getUserStatus(),
-          getUserGroups(username), createdAt);
+      userAccountDetails = new UserAccountDetailsDto(result.getUsername(), mfaStatus,
+          result.getUserStatus(), getUserGroups(username), createdAt);
     } catch (UserNotFoundException e) {
       log.info("User '{}' not found.", username);
-      userAccountDetails = new UserAccountDetailsDto(NO_ACCOUNT, NO_ACCOUNT, List.of(), null);
+      userAccountDetails = new UserAccountDetailsDto(null, NO_ACCOUNT, NO_ACCOUNT, List.of(), null);
     }
 
     return userAccountDetails;
@@ -133,12 +135,13 @@ public class UserAccountService {
   /**
    * Update the Contact Details for the given user account.
    *
-   * @param userId   The ID of the user account.
-   * @param newEmail The new email to be used.
+   * @param userId    The ID of the user account.
+   * @param newEmail  The new email to be used.
    * @param forenames The new forenames to be used.
-   * @param surname The new surname to be used.
+   * @param surname   The new surname to be used.
    */
-  public void updateContactDetails(String userId, String newEmail, String forenames, String surname) {
+  public void updateContactDetails(String userId, String newEmail, String forenames,
+      String surname) {
     log.info("Updating email to '{}' for user '{}'.", newEmail, userId);
 
     List<AttributeType> attributeTypes = new ArrayList<>();
@@ -280,6 +283,107 @@ public class UserAccountService {
 
     cognitoIdp.adminSetUserMFAPreference(request);
     log.info("MFA reset for user '{}'.", username);
+  }
+
+  /**
+   * Delete duplicate accounts for a trainee, leaving a single account. Deletion will only be
+   * performed if there is enough certainty about which account to keep.
+   *
+   * @param traineeId    The ID of the trainee.
+   * @param accountIds   The list of identified duplicates.
+   * @param currentEmail The current email of the trainee.
+   * @return The remaining account ID, empty if duplicates could not be deleted.
+   */
+  public Optional<String> deleteDuplicateAccounts(String traineeId, Set<String> accountIds,
+      String currentEmail) {
+    log.info("{} accounts found for trainee {}, deleting duplicates. Found: [{}]",
+        accountIds.size(), traineeId, String.join(",", accountIds));
+    String mainAccount = identifyMainAccount(traineeId, accountIds, currentEmail);
+
+    if (mainAccount == null) {
+      log.info("Could not determine the main account for trainee {}, skipping de-duplication.",
+          traineeId);
+      return Optional.empty();
+    }
+
+    accountIds.stream()
+        .filter(accountId -> !accountId.equals(mainAccount))
+        .forEach(this::deleteCognitoAccount);
+    return Optional.of(mainAccount);
+  }
+
+  /**
+   * Identifies the main account out of multiple duplicates.
+   *
+   * @param traineeId    The ID of the trainee.
+   * @param accountIds   The list of identified duplicates.
+   * @param currentEmail The current email of the trainee.
+   * @return The main account, based on a set of rules. Null if it could not be determined.
+   */
+  private String identifyMainAccount(String traineeId, Set<String> accountIds,
+      String currentEmail) {
+    UserAccountDetailsDto currentEmailAccount = getUserAccountDetails(currentEmail);
+    String currentEmailUsername = currentEmailAccount.getUsername();
+
+    if (currentEmailUsername != null && accountIds.contains(currentEmailUsername)) {
+      log.info("Found existing account {} for trainee {} matching current TIS email '{}'.",
+          currentEmailUsername, traineeId, currentEmail);
+      return currentEmailUsername;
+    }
+
+    for (String accountId : accountIds) {
+      Instant lastSignIn = getLastSuccessfulSignIn(accountId);
+
+      if (lastSignIn == null) {
+        log.info("Found successless account {} for trainee {}.", accountId, traineeId);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get the last successful sign-in timestamp for a particular user.
+   *
+   * @param username The username for the account.
+   * @return The timestamp of the last successful sign-in, or null if no success found.
+   */
+  private Instant getLastSuccessfulSignIn(String username) {
+    String paginationToken = null;
+
+    do {
+      AdminListUserAuthEventsRequest listAuthRequest = new AdminListUserAuthEventsRequest()
+          .withUserPoolId(userPoolId)
+          .withUsername(username)
+          .withNextToken(paginationToken);
+
+      try {
+        AdminListUserAuthEventsResult result = cognitoIdp.adminListUserAuthEvents(listAuthRequest);
+
+        Optional<Date> lastSignIn = result.getAuthEvents().stream()
+            .filter(event -> event.getEventType().equals(EventType.SignIn.toString()))
+            .filter(event -> event.getEventResponse().equals(EventResponseType.Pass.toString()))
+            .map(AuthEventType::getCreationDate)
+            .findFirst();
+
+        if (lastSignIn.isPresent()) {
+          return lastSignIn.get().toInstant();
+        } else {
+          paginationToken = result.getNextToken();
+        }
+      } catch (TooManyRequestsException tmre) {
+        try {
+          // Cognito requests are limited to 5 per second.
+          log.warn("Cognito requests have exceed the limit.", tmre);
+          Thread.sleep(200);
+        } catch (InterruptedException ie) {
+          log.warn("Unable to sleep thread.", ie);
+          Thread.currentThread().interrupt();
+        }
+      }
+    } while (paginationToken != null);
+
+    return null;
   }
 
   /**
@@ -451,7 +555,7 @@ public class UserAccountService {
   /**
    * Update the Contact Details on Cognito for the given user account.
    *
-   * @param userId   The ID of the user account.
+   * @param userId         The ID of the user account.
    * @param attributeTypes The attributes to update
    */
   private void updateCognitoContactDetails(String userId, List<AttributeType> attributeTypes) {

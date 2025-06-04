@@ -24,6 +24,7 @@ package uk.nhs.tis.trainee.usermanagement.event;
 import static io.awspring.cloud.messaging.listener.SqsMessageDeletionPolicy.ON_SUCCESS;
 
 import io.awspring.cloud.messaging.listener.annotation.SqsListener;
+import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -61,10 +62,18 @@ public class ContactDetailsListener {
         service.updateContactDetails(accountId, dto.email(), dto.forenames(), dto.surname());
       }
       default -> {
-        String message = String.format(
-            "%s accounts found for trainee %s, unable to update contact details. Found: [%s]",
-            userAccountIds.size(), traineeId, String.join(",", userAccountIds));
-        throw new IllegalArgumentException(message);
+        Optional<String> accountId = service.deleteDuplicateAccounts(traineeId, userAccountIds,
+            dto.email());
+
+        if (accountId.isPresent()) {
+          service.updateContactDetails(accountId.get(), dto.email(), dto.forenames(),
+              dto.surname());
+        } else {
+          String message = String.format(
+              "%s accounts found for trainee %s, unable to update contact details. Found: [%s]",
+              userAccountIds.size(), traineeId, String.join(",", userAccountIds));
+          throw new IllegalArgumentException(message);
+        }
       }
     }
   }
