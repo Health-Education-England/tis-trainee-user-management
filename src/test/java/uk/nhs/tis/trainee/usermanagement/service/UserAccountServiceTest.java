@@ -45,7 +45,6 @@ import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupResult;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserResult;
-import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsRequest;
@@ -77,6 +76,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -291,10 +292,12 @@ class UserAccountServiceTest {
   void shouldThrowExceptionUpdatingEmailWhenEmailBelongsToAnotherAccount() {
     String newEmail = "new.email@example.com";
 
-    AdminGetUserResult getUserResult = new AdminGetUserResult();
-    getUserResult.setUsername(USER_ID_2);
+    ListUsersResult listUsersResult = new ListUsersResult()
+        .withUsers(
+            new UserType().withUsername(USER_ID_2)
+        );
 
-    when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
+    when(cognitoIdp.listUsers(any())).thenReturn(listUsersResult);
 
     assertThrows(IllegalArgumentException.class,
         () -> service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1));
@@ -306,10 +309,12 @@ class UserAccountServiceTest {
   void shouldOnlyUpdateNamesWhenTheEmailHasNotChanged() {
     String newEmail = "new.email@example.com";
 
-    AdminGetUserResult getUserResult = new AdminGetUserResult();
-    getUserResult.setUsername(USER_ID_1);
+    ListUsersResult listUsersResult = new ListUsersResult()
+        .withUsers(
+            new UserType().withUsername(USER_ID_1)
+        );
 
-    when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
+    when(cognitoIdp.listUsers(any())).thenReturn(listUsersResult);
 
     service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_2, SURNAME_2);
 
@@ -338,24 +343,26 @@ class UserAccountServiceTest {
   void shouldUpdateEmailAndNamesWhenNewEmailNotExistsInUserPool() {
     String newEmail = "new.email@example.com";
 
-    ArgumentCaptor<AdminGetUserRequest> getRequestCaptor = ArgumentCaptor.forClass(
-        AdminGetUserRequest.class);
-    when(cognitoIdp.adminGetUser(getRequestCaptor.capture()))
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.forClass(
+        ListUsersRequest.class);
+    when(cognitoIdp.listUsers(listUsersCaptor.capture()))
         .thenThrow(UserNotFoundException.class)
-        .thenReturn(new AdminGetUserResult()
-            .withUserAttributes(new AttributeType()
-                .withName("name")
-                .withValue("value")
+        .thenReturn(new ListUsersResult()
+            .withUsers(
+                new UserType().withAttributes(
+                    new AttributeType().withName("name").withValue("value")
+                )
             )
         );
 
     service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_2, SURNAME_2);
 
-    List<AdminGetUserRequest> getRequests = getRequestCaptor.getAllValues();
-    assertThat("Unexpected get request count.", getRequests.size(), is(2));
+    List<ListUsersRequest> listUsersRequests = listUsersCaptor.getAllValues();
+    assertThat("Unexpected list users request count.", listUsersRequests.size(), is(2));
 
-    AdminGetUserRequest getRequest = getRequests.get(0);
-    assertThat("Unexpected username.", getRequest.getUsername(), is(newEmail));
+    ListUsersRequest listUsersRequest = listUsersRequests.get(0);
+    assertThat("Unexpected filter.", listUsersRequest.getFilter(),
+        is(String.format("email=\"%s\"", newEmail)));
 
     ArgumentCaptor<AdminUpdateUserAttributesRequest> updateRequestCaptor = ArgumentCaptor.forClass(
         AdminUpdateUserAttributesRequest.class);
@@ -391,24 +398,26 @@ class UserAccountServiceTest {
     String previousEmail = "previous.email@example.com";
     String newEmail = "new.email@example.com";
 
-    ArgumentCaptor<AdminGetUserRequest> getRequestCaptor = ArgumentCaptor.forClass(
-        AdminGetUserRequest.class);
-    when(cognitoIdp.adminGetUser(getRequestCaptor.capture()))
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.forClass(
+        ListUsersRequest.class);
+    when(cognitoIdp.listUsers(listUsersCaptor.capture()))
         .thenThrow(UserNotFoundException.class)
-        .thenReturn(new AdminGetUserResult()
-            .withUserAttributes(
-                new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(previousEmail),
-                new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
-            )
-        );
+        .thenReturn(new ListUsersResult()
+            .withUsers(
+                new UserType().withAttributes(
+                    new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(previousEmail),
+                    new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+                )
+            ));
 
     service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1);
 
-    List<AdminGetUserRequest> getRequests = getRequestCaptor.getAllValues();
-    assertThat("Unexpected get request count.", getRequests.size(), is(2));
+    List<ListUsersRequest> listUsersRequests = listUsersCaptor.getAllValues();
+    assertThat("Unexpected list users request count.", listUsersRequests.size(), is(2));
 
-    AdminGetUserRequest getRequest = getRequests.get(1);
-    assertThat("Unexpected username.", getRequest.getUsername(), is(USER_ID_1));
+    ListUsersRequest listUsersRequest = listUsersRequests.get(1);
+    assertThat("Unexpected filter.", listUsersRequest.getFilter(),
+        is(String.format("sub=\"%s\"", USER_ID_1)));
 
     verify(eventPublishService).publishEmailUpdateEvent(USER_ID_1, TRAINEE_ID_1, previousEmail,
         newEmail);
@@ -459,9 +468,11 @@ class UserAccountServiceTest {
     when(cognitoIdp.adminDeleteUser(requestCaptor.capture())).thenReturn(
         new AdminDeleteUserResult());
 
-    AdminGetUserResult getUserResult = new AdminGetUserResult();
-    getUserResult.setUserStatus(UserStatusType.CONFIRMED);
-    when(cognitoIdp.adminGetUser(any())).thenReturn(getUserResult);
+    ListUsersResult listUsersResult = new ListUsersResult()
+        .withUsers(
+            new UserType().withUserStatus(UserStatusType.CONFIRMED)
+        );
+    when(cognitoIdp.listUsers(any())).thenReturn(listUsersResult);
     when(service.getUserMfaType(any())).thenReturn(TOTP);
 
     service.deleteCognitoAccount(EMAIL);
@@ -474,45 +485,60 @@ class UserAccountServiceTest {
 
   @Test
   void shouldGetAccountByCurrentEmailWhenDeletingDuplicates() {
-    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
-        AdminGetUserRequest.class);
-    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
-      AdminGetUserRequest request = inv.getArgument(0);
-      boolean isGetByEmail = request.getUsername().equals(EMAIL);
-      String username = isGetByEmail ? USER_ID_1 : request.getUsername();
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.forClass(
+        ListUsersRequest.class);
+    when(cognitoIdp.listUsers(listUsersCaptor.capture())).thenAnswer(inv -> {
+      ListUsersRequest request = inv.getArgument(0);
+      Pattern filterPattern = Pattern.compile("(email|sub)=\"(.+)\"");
+      Matcher matcher = filterPattern.matcher(request.getFilter());
+      matcher.find();
+
+      boolean isGetByEmail = matcher.group(1).equals("email");
+      String username = isGetByEmail ? USER_ID_1 : matcher.group(2);
       String email = isGetByEmail ? EMAIL : "no-match@example.com";
 
-      return new AdminGetUserResult()
-          .withUsername(username)
-          .withUserAttributes(
-              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(email),
-              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
-          )
-          .withUserStatus(UserStatusType.CONFIRMED);
+      return new ListUsersResult()
+          .withUsers(
+              new UserType()
+                  .withUsername(username)
+                  .withAttributes(
+                      new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(email),
+                      new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+                  )
+                  .withUserStatus(UserStatusType.CONFIRMED)
+          );
     });
 
     service.deleteDuplicateAccounts(TRAINEE_ID_1, Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
 
-    AdminGetUserRequest getUserRequest = getUserCaptor.getAllValues().get(0);
-    assertThat("Unexpected user pool.", getUserRequest.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected get user username.", getUserRequest.getUsername(), is(EMAIL));
+    ListUsersRequest listUsersRequest = listUsersCaptor.getAllValues().get(0);
+    assertThat("Unexpected user pool.", listUsersRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected list users filter.", listUsersRequest.getFilter(),
+        is(String.format("email=\"%s\"", EMAIL)));
   }
 
   @Test
   void shouldDeleteDuplicatesWhenTisEmailMatches() {
-    when(cognitoIdp.adminGetUser(any())).thenAnswer(inv -> {
-      AdminGetUserRequest request = inv.getArgument(0);
-      boolean isGetByEmail = request.getUsername().equals(EMAIL);
-      String username = isGetByEmail ? USER_ID_1 : request.getUsername();
+    when(cognitoIdp.listUsers(any())).thenAnswer(inv -> {
+      ListUsersRequest request = inv.getArgument(0);
+      Pattern filterPattern = Pattern.compile("(email|sub)=\"(.+)\"");
+      Matcher matcher = filterPattern.matcher(request.getFilter());
+      matcher.find();
+
+      boolean isGetByEmail = matcher.group(1).equals("email");
+      String username = isGetByEmail ? USER_ID_1 : matcher.group(2);
       String email = isGetByEmail ? EMAIL : "no-match@example.com";
 
-      return new AdminGetUserResult()
-          .withUsername(username)
-          .withUserAttributes(
-              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(email),
-              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
-          )
-          .withUserStatus(UserStatusType.CONFIRMED);
+      return new ListUsersResult()
+          .withUsers(
+              new UserType()
+                  .withUsername(username)
+                  .withAttributes(
+                      new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(email),
+                      new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+                  )
+                  .withUserStatus(UserStatusType.CONFIRMED)
+          );
     });
 
     Optional<String> accountId = service.deleteDuplicateAccounts(TRAINEE_ID_1,
@@ -541,20 +567,28 @@ class UserAccountServiceTest {
 
   @Test
   void shouldNotDeleteDuplicatesWhenTisEmailNotMatchesAndNoSuccessfulAuth() {
-    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
-        AdminGetUserRequest.class);
-    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
-      AdminGetUserRequest request = inv.getArgument(0);
-      String username = request.getUsername().equals(EMAIL) ? UUID.randomUUID().toString()
-          : request.getUsername();
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.forClass(
+        ListUsersRequest.class);
+    when(cognitoIdp.listUsers(listUsersCaptor.capture())).thenAnswer(inv -> {
+      ListUsersRequest request = inv.getArgument(0);
+      Pattern filterPattern = Pattern.compile("(email|sub)=\"(.+)\"");
+      Matcher matcher = filterPattern.matcher(request.getFilter());
+      matcher.find();
 
-      return new AdminGetUserResult()
-          .withUsername(username)
-          .withUserAttributes(
-              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue("no-match@example.com"),
-              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
-          )
-          .withUserStatus(UserStatusType.CONFIRMED);
+      String filterValue = matcher.group(2);
+      String username = filterValue.equals(EMAIL) ? UUID.randomUUID().toString() : filterValue;
+
+      return new ListUsersResult()
+          .withUsers(
+              new UserType()
+                  .withUsername(username)
+                  .withAttributes(
+                      new AttributeType().withName(ATTRIBUTE_EMAIL)
+                          .withValue("no-match@example.com"),
+                      new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+                  )
+                  .withUserStatus(UserStatusType.CONFIRMED)
+          );
     });
 
     when(cognitoIdp.adminListUserAuthEvents(any())).thenReturn(
@@ -567,9 +601,10 @@ class UserAccountServiceTest {
 
     assertThat("Unexpected remaining account.", accountId, is(Optional.empty()));
 
-    AdminGetUserRequest getUserRequest = getUserCaptor.getAllValues().get(0);
-    assertThat("Unexpected user pool.", getUserRequest.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected get user username.", getUserRequest.getUsername(), is(EMAIL));
+    ListUsersRequest listUsersRequest = listUsersCaptor.getAllValues().get(0);
+    assertThat("Unexpected user pool.", listUsersRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected list users filter.", listUsersRequest.getFilter(),
+        is(String.format("email=\"%s\"", EMAIL)));
 
     verify(cognitoIdp, times(0)).adminDeleteUser(any());
     verify(metricsService, times(0)).incrementDeleteAccountCounter(any(), any());
@@ -577,20 +612,28 @@ class UserAccountServiceTest {
 
   @Test
   void shouldNotDeleteDuplicatesWhenTisEmailNotMatchesAndSuccessfulAuth() {
-    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
-        AdminGetUserRequest.class);
-    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
-      AdminGetUserRequest request = inv.getArgument(0);
-      String username = request.getUsername().equals(EMAIL) ? UUID.randomUUID().toString()
-          : request.getUsername();
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.forClass(
+        ListUsersRequest.class);
+    when(cognitoIdp.listUsers(listUsersCaptor.capture())).thenAnswer(inv -> {
+      ListUsersRequest request = inv.getArgument(0);
+      Pattern filterPattern = Pattern.compile("(email|sub)=\"(.+)\"");
+      Matcher matcher = filterPattern.matcher(request.getFilter());
+      matcher.find();
 
-      return new AdminGetUserResult()
-          .withUsername(username)
-          .withUserAttributes(
-              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue("no-match@example.com"),
-              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
-          )
-          .withUserStatus(UserStatusType.CONFIRMED);
+      String filterValue = matcher.group(2);
+      String username = filterValue.equals(EMAIL) ? UUID.randomUUID().toString() : filterValue;
+
+      return new ListUsersResult()
+          .withUsers(
+              new UserType()
+                  .withUsername(username)
+                  .withAttributes(
+                      new AttributeType().withName(ATTRIBUTE_EMAIL)
+                          .withValue("no-match@example.com"),
+                      new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+                  )
+                  .withUserStatus(UserStatusType.CONFIRMED)
+          );
     });
 
     when(cognitoIdp.adminListUserAuthEvents(any())).thenReturn(
@@ -608,9 +651,10 @@ class UserAccountServiceTest {
 
     assertThat("Unexpected remaining account.", accountId, is(Optional.empty()));
 
-    AdminGetUserRequest getUserRequest = getUserCaptor.getAllValues().get(0);
-    assertThat("Unexpected user pool.", getUserRequest.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected get user username.", getUserRequest.getUsername(), is(EMAIL));
+    ListUsersRequest listUsersRequest = listUsersCaptor.getAllValues().get(0);
+    assertThat("Unexpected user pool.", listUsersRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected list users filter.", listUsersRequest.getFilter(),
+        is(String.format("email=\"%s\"", EMAIL)));
 
     verify(cognitoIdp, times(0)).adminDeleteUser(any());
     verify(metricsService, times(0)).incrementDeleteAccountCounter(any(), any());
@@ -618,20 +662,26 @@ class UserAccountServiceTest {
 
   @Test
   void shouldRetryPaginatingThroughAuthEventsWhenRateLimitedGettingAuthEvents() {
-    ArgumentCaptor<AdminGetUserRequest> getUserCaptor = ArgumentCaptor.forClass(
-        AdminGetUserRequest.class);
-    when(cognitoIdp.adminGetUser(getUserCaptor.capture())).thenAnswer(inv -> {
-      AdminGetUserRequest request = inv.getArgument(0);
-      String username = request.getUsername().equals(EMAIL) ? UUID.randomUUID().toString()
-          : request.getUsername();
+    when(cognitoIdp.listUsers(any())).thenAnswer(inv -> {
+      ListUsersRequest request = inv.getArgument(0);
+      Pattern filterPattern = Pattern.compile("(email|sub)=\"(.+)\"");
+      Matcher matcher = filterPattern.matcher(request.getFilter());
+      matcher.find();
 
-      return new AdminGetUserResult()
-          .withUsername(username)
-          .withUserAttributes(
-              new AttributeType().withName(ATTRIBUTE_EMAIL).withValue("no-match@example.com"),
-              new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
-          )
-          .withUserStatus(UserStatusType.CONFIRMED);
+      String filterValue = matcher.group(2);
+      String username = filterValue.equals(EMAIL) ? UUID.randomUUID().toString() : filterValue;
+
+      return new ListUsersResult()
+          .withUsers(
+              new UserType()
+                  .withUsername(username)
+                  .withAttributes(
+                      new AttributeType().withName(ATTRIBUTE_EMAIL)
+                          .withValue("no-match@example.com"),
+                      new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID_1)
+                  )
+                  .withUserStatus(UserStatusType.CONFIRMED)
+          );
     });
 
     ArgumentCaptor<AdminListUserAuthEventsRequest> authEventCaptor = ArgumentCaptor.forClass(

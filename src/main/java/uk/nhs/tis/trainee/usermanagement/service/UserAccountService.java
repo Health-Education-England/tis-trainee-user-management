@@ -78,6 +78,12 @@ public class UserAccountService {
   private static final String NO_MFA = "NO_MFA";
   private static final Integer MAX_LOGIN_EVENTS = 10;
 
+  private static final String ATTRIBUTE_EMAIL = "email";
+  private static final String ATTRIBUTE_EMAIL_VERIFIED = "email_verified";
+  private static final String ATTRIBUTE_SUB = "sub";
+  private static final String ATTRIBUTE_TIS_ID = "custom:tisId";
+
+
   private final MetricsService metricsService;
 
   private final AWSCognitoIdentityProvider cognitoIdp;
@@ -100,7 +106,8 @@ public class UserAccountService {
   }
 
   /**
-   * Get the user account details for the account associated with the given username.
+   * Get the user account details for the account associated with the given username. Warning: this
+   * will contribute to monthly active user (MAU) count for the purposes of billing.
    *
    * @param username The username for the account.
    * @return The user account details.
@@ -150,15 +157,12 @@ public class UserAccountService {
 
     try {
       // Verify that the new email is not already used.
-      AdminGetUserRequest request = new AdminGetUserRequest();
-      request.setUserPoolId(userPoolId);
-      request.setUsername(newEmail);
-      AdminGetUserResult result = cognitoIdp.adminGetUser(request);
-      String existingUserId = result.getUsername();
+      UserType existingUser = getUser(newEmail);
+      String existingUserId = existingUser.getUsername();
 
       if (existingUserId.equals(userId)) {
-        updateCognitoContactDetails(userId, attributeTypes);
         log.info("The email for this user has not changed, skipping email update.");
+        updateCognitoContactDetails(userId, attributeTypes);
       } else {
         String message = String.format("The email '%s' is already in use by user '%s'.", newEmail,
             existingUserId);
@@ -166,21 +170,18 @@ public class UserAccountService {
       }
     } catch (UserNotFoundException e) {
       // If an existing user was not found then the new email address can be used.
-      AdminGetUserRequest getRequest = new AdminGetUserRequest();
-      getRequest.setUserPoolId(userPoolId);
-      getRequest.setUsername(userId);
-      AdminGetUserResult existingDetails = cognitoIdp.adminGetUser(getRequest);
-      final Optional<String> existingEmail = existingDetails.getUserAttributes().stream()
-          .filter(ua -> ua.getName().equals("email"))
+      UserType existingUser = getUser(userId);
+      final Optional<String> existingEmail = existingUser.getAttributes().stream()
+          .filter(ua -> ua.getName().equals(ATTRIBUTE_EMAIL))
           .map(AttributeType::getValue)
           .findFirst();
-      final Optional<String> traineeId = existingDetails.getUserAttributes().stream()
-          .filter(ua -> ua.getName().equals("custom:tisId"))
+      final Optional<String> traineeId = existingUser.getAttributes().stream()
+          .filter(ua -> ua.getName().equals(ATTRIBUTE_TIS_ID))
           .map(AttributeType::getValue)
           .findFirst();
 
-      attributeTypes.add(new AttributeType().withName("email").withValue(newEmail));
-      attributeTypes.add(new AttributeType().withName("email_verified").withValue("true"));
+      attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(newEmail));
+      attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL_VERIFIED).withValue("true"));
       updateCognitoContactDetails(userId, attributeTypes);
 
       eventPublishService.publishEmailUpdateEvent(userId, traineeId.orElse(null),
@@ -322,7 +323,7 @@ public class UserAccountService {
    */
   private String identifyMainAccount(String traineeId, Set<String> accountIds,
       String currentEmail) {
-    UserAccountDetailsDto currentEmailAccount = getUserAccountDetails(currentEmail);
+    UserType currentEmailAccount = getUser(currentEmail);
     String currentEmailUsername = currentEmailAccount.getUsername();
 
     if (currentEmailUsername != null && accountIds.contains(currentEmailUsername)) {
@@ -509,16 +510,41 @@ public class UserAccountService {
             .collect(Collectors.toMap(AttributeType::getName, AttributeType::getValue))
         )
         .forEach(attr -> {
-          String tisId = attr.get("custom:tisId");
+          String tisId = attr.get(ATTRIBUTE_TIS_ID);
           Set<String> ids = cache.get(tisId, Set.class);
 
           if (ids == null) {
             ids = new HashSet<>();
           }
 
-          ids.add(attr.get("sub"));
+          ids.add(attr.get(ATTRIBUTE_SUB));
           cache.put(tisId, ids);
         });
+  }
+
+  /**
+   * Get a {@link UserType} for the given username.
+   *
+   * @param username The username to search for, should be an email or sub.
+   * @return The user matching the username.
+   * @throws UserNotFoundException If no users were found for the given username.
+   */
+  private UserType getUser(String username) throws UserNotFoundException {
+    String attribute = username.contains("@") ? ATTRIBUTE_EMAIL : ATTRIBUTE_SUB;
+    ListUsersRequest request = new ListUsersRequest()
+        .withUserPoolId(userPoolId)
+        .withFilter(String.format("%s=\"%s\"", attribute, username));
+
+    ListUsersResult result = cognitoIdp.listUsers(request);
+    List<UserType> users = result.getUsers();
+
+    if (users.isEmpty()) {
+      String message = String.format("User not found in user pool '%s' with the username '%s'.",
+          userPoolId, username);
+      throw new UserNotFoundException(message);
+    }
+
+    return users.get(0);
   }
 
   protected MfaType getUserMfaType(String username) {
@@ -544,12 +570,15 @@ public class UserAccountService {
     return request;
   }
 
+  /**
+   * Get the user status of the given user.
+   *
+   * @param username The username to get the status of.
+   * @return The user status type.
+   */
   private UserStatusType getUserStatus(String username) {
-    AdminGetUserRequest request = new AdminGetUserRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-    AdminGetUserResult result = cognitoIdp.adminGetUser(request);
-    return UserStatusType.valueOf(result.getUserStatus());
+    UserType user = getUser(username);
+    return UserStatusType.valueOf(user.getUserStatus());
   }
 
   /**
