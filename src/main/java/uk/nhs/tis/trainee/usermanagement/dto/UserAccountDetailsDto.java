@@ -21,16 +21,23 @@
 
 package uk.nhs.tis.trainee.usermanagement.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
+import lombok.Builder;
 import lombok.Value;
 
+@Builder
 @Value
 public class UserAccountDetailsDto {
 
-  String username;
+  String id;
+  @JsonProperty("username")
+  String email;
   String mfaStatus;
   String userStatus;
-  List<String> groups;
+  @Builder.Default
+  List<String> groups = List.of();
   Instant accountCreated;
+  String traineeId;
 }
