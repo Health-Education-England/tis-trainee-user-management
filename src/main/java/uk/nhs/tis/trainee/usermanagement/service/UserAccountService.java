@@ -80,9 +80,9 @@ public class UserAccountService {
 
   private static final String ATTRIBUTE_EMAIL = "email";
   private static final String ATTRIBUTE_EMAIL_VERIFIED = "email_verified";
+  private static final String ATTRIBUTE_MFA_TYPE = "custom:mfaType";
   private static final String ATTRIBUTE_SUB = "sub";
   private static final String ATTRIBUTE_TIS_ID = "custom:tisId";
-
 
   private final MetricsService metricsService;
 
@@ -162,7 +162,7 @@ public class UserAccountService {
 
       if (existingUserId.equals(userId)) {
         log.info("The email for this user has not changed, skipping email update.");
-        updateCognitoContactDetails(userId, attributeTypes);
+        updateCognitoAttributes(userId, attributeTypes);
       } else {
         String message = String.format("The email '%s' is already in use by user '%s'.", newEmail,
             existingUserId);
@@ -182,7 +182,7 @@ public class UserAccountService {
 
       attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(newEmail));
       attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL_VERIFIED).withValue("true"));
-      updateCognitoContactDetails(userId, attributeTypes);
+      updateCognitoAttributes(userId, attributeTypes);
 
       eventPublishService.publishEmailUpdateEvent(userId, traineeId.orElse(null),
           existingEmail.orElse(null), newEmail);
@@ -275,14 +275,15 @@ public class UserAccountService {
    */
   public void resetUserAccountMfa(String username) {
     log.info("Resetting MFA for user '{}'.", username);
-    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
-
     metricsService.incrementMfaResetCounter(getUserMfaType(username));
 
+    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
     request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
     request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
-
     cognitoIdp.adminSetUserMFAPreference(request);
+
+    updateCognitoAttributes(username,
+        List.of(new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(NO_MFA)));
     log.info("MFA reset for user '{}'.", username);
   }
 
@@ -582,18 +583,18 @@ public class UserAccountService {
   }
 
   /**
-   * Update the Contact Details on Cognito for the given user account.
+   * Update the user attributes on Cognito for the given user account.
    *
    * @param userId         The ID of the user account.
-   * @param attributeTypes The attributes to update
+   * @param attributeTypes The attributes to update.
    */
-  private void updateCognitoContactDetails(String userId, List<AttributeType> attributeTypes) {
+  private void updateCognitoAttributes(String userId, List<AttributeType> attributeTypes) {
     AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest();
     updateRequest.setUserPoolId(userPoolId);
     updateRequest.setUsername(userId);
 
     updateRequest.setUserAttributes(attributeTypes);
     cognitoIdp.adminUpdateUserAttributes(updateRequest);
-    log.info("Contact details updated for user '{}'.", userId);
+    log.info("Attributes updated for user '{}'.", userId);
   }
 }

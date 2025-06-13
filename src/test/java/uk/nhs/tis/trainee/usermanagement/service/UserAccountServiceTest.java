@@ -81,6 +81,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -423,14 +425,15 @@ class UserAccountServiceTest {
         newEmail);
   }
 
-  @Test
-  void shouldResetSmsMfa() {
+  @ParameterizedTest
+  @EnumSource(MfaType.class)
+  void shouldResetMfa(MfaType mfaType) {
     ArgumentCaptor<AdminSetUserMFAPreferenceRequest> requestCaptor = ArgumentCaptor.forClass(
         AdminSetUserMFAPreferenceRequest.class);
 
     when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
         new AdminSetUserMFAPreferenceResult());
-    when(service.getUserMfaType(EMAIL)).thenReturn(SMS);
+    when(service.getUserMfaType(EMAIL)).thenReturn(mfaType);
 
     service.resetUserAccountMfa(EMAIL);
 
@@ -438,26 +441,45 @@ class UserAccountServiceTest {
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
     assertThat("Unexpected username.", request.getUsername(), is(EMAIL));
     assertThat("Unexpected SMS enabled flag.", request.getSMSMfaSettings().getEnabled(), is(false));
-    verify(metricsService).incrementMfaResetCounter(any());
+    assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
+        is(false));
   }
 
-  @Test
-  void shouldResetTotpMfa() {
-    ArgumentCaptor<AdminSetUserMFAPreferenceRequest> requestCaptor = ArgumentCaptor.forClass(
-        AdminSetUserMFAPreferenceRequest.class);
-
-    when(cognitoIdp.adminSetUserMFAPreference(requestCaptor.capture())).thenReturn(
+  @ParameterizedTest
+  @EnumSource(MfaType.class)
+  void shouldUpdateUserAttributeWhenMfaReset(MfaType mfaType) {
+    when(cognitoIdp.adminSetUserMFAPreference(any())).thenReturn(
         new AdminSetUserMFAPreferenceResult());
-    when(service.getUserMfaType(EMAIL)).thenReturn(TOTP);
+    when(service.getUserMfaType(EMAIL)).thenReturn(mfaType);
 
     service.resetUserAccountMfa(EMAIL);
 
-    AdminSetUserMFAPreferenceRequest request = requestCaptor.getValue();
-    assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.getUsername(), is(EMAIL));
-    assertThat("Unexpected TOTP enabled flag.", request.getSoftwareTokenMfaSettings().getEnabled(),
-        is(false));
-    verify(metricsService).incrementMfaResetCounter(TOTP);
+    ArgumentCaptor<AdminUpdateUserAttributesRequest> updateRequestCaptor = ArgumentCaptor.forClass(
+        AdminUpdateUserAttributesRequest.class);
+    verify(cognitoIdp).adminUpdateUserAttributes(updateRequestCaptor.capture());
+
+    AdminUpdateUserAttributesRequest updateRequest = updateRequestCaptor.getValue();
+    assertThat("Unexpected user pool.", updateRequest.getUserPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected username.", updateRequest.getUsername(), is(EMAIL));
+
+    List<AttributeType> userAttributes = updateRequest.getUserAttributes();
+    assertThat("Unexpected attribute count.", userAttributes, hasSize(1));
+
+    AttributeType userAttribute = userAttributes.get(0);
+    assertThat("Unexpected attribute name.", userAttribute.getName(), is("custom:mfaType"));
+    assertThat("Unexpected attribute value.", userAttribute.getValue(), is("NO_MFA"));
+  }
+
+  @ParameterizedTest
+  @EnumSource(MfaType.class)
+  void shouldPublishMetricWhenMfaReset(MfaType mfaType) {
+    when(cognitoIdp.adminSetUserMFAPreference(any())).thenReturn(
+        new AdminSetUserMFAPreferenceResult());
+    when(service.getUserMfaType(EMAIL)).thenReturn(mfaType);
+
+    service.resetUserAccountMfa(EMAIL);
+
+    verify(metricsService).incrementMfaResetCounter(mfaType);
   }
 
   @Test
@@ -554,9 +576,8 @@ class UserAccountServiceTest {
     assertThat("Unexpected request count.", deleteUserRequests, hasSize(2));
 
     Set<String> deletedIds = deleteUserRequests.stream()
-        .peek(request -> {
-          assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
-        })
+        .peek(request -> assertThat("Unexpected user pool.", request.getUserPoolId(),
+            is(USER_POOL_ID)))
         .map(AdminDeleteUserRequest::getUsername)
         .collect(Collectors.toSet());
     assertThat("Unexpected deleted account count.", deletedIds, hasSize(2));
@@ -748,40 +769,40 @@ class UserAccountServiceTest {
   void shouldGetUserLoginsWhenUserFoundGettingUserLogins() {
     Date eventDate = new Date();
 
-    AuthEventType authEventTypeOne = new AuthEventType();
-    authEventTypeOne.setCreationDate(eventDate);
-    authEventTypeOne.setEventId("EVENT_ID");
-    authEventTypeOne.setEventType("EVENT_TYPE");
-    authEventTypeOne.setEventResponse("RESPONSE");
+    ChallengeResponseType challenge1 = new ChallengeResponseType()
+        .withChallengeName("Password")
+        .withChallengeResponse("Success");
+    ChallengeResponseType challenge2 = new ChallengeResponseType()
+        .withChallengeName("Mfa")
+        .withChallengeResponse("Failure");
 
-    ChallengeResponseType challenge1 = new ChallengeResponseType();
-    challenge1.setChallengeName("Password");
-    challenge1.setChallengeResponse("Success");
-    ChallengeResponseType challenge2 = new ChallengeResponseType();
-    challenge2.setChallengeName("Mfa");
-    challenge2.setChallengeResponse("Failure");
-    authEventTypeOne.setChallengeResponses(List.of(challenge1, challenge2));
+    EventContextDataType eventContextDataType = new EventContextDataType()
+        .withDeviceName("DEVICE");
 
-    EventContextDataType eventContextDataType = new EventContextDataType();
-    eventContextDataType.setDeviceName("DEVICE");
-    authEventTypeOne.setEventContextData(eventContextDataType);
+    AuthEventType authEventTypeOne = new AuthEventType()
+        .withCreationDate(eventDate)
+        .withEventId("EVENT_ID")
+        .withEventType("EVENT_TYPE")
+        .withEventResponse("RESPONSE")
+        .withChallengeResponses(List.of(challenge1, challenge2))
+        .withEventContextData(eventContextDataType);
 
     Date eventDateTwo = new Date();
 
-    AuthEventType authEventTypeTwo = new AuthEventType();
-    authEventTypeTwo.setCreationDate(eventDateTwo);
-    authEventTypeTwo.setEventId("EVENT_ID_2");
-    authEventTypeTwo.setEventType("EVENT_TYPE_2");
-    authEventTypeTwo.setEventResponse("RESPONSE_2");
+    ChallengeResponseType challenge3 = new ChallengeResponseType()
+        .withChallengeName("Password")
+        .withChallengeResponse("Failure");
 
-    ChallengeResponseType challenge3 = new ChallengeResponseType();
-    challenge3.setChallengeName("Password");
-    challenge3.setChallengeResponse("Failure");
-    authEventTypeTwo.setChallengeResponses(List.of(challenge3));
+    EventContextDataType eventContextDataTypeTwo = new EventContextDataType()
+        .withDeviceName("DEVICE_2");
 
-    EventContextDataType eventContextDataTypeTwo = new EventContextDataType();
-    eventContextDataTypeTwo.setDeviceName("DEVICE_2");
-    authEventTypeTwo.setEventContextData(eventContextDataTypeTwo);
+    AuthEventType authEventTypeTwo = new AuthEventType()
+        .withCreationDate(eventDateTwo)
+        .withEventId("EVENT_ID_2")
+        .withEventType("EVENT_TYPE_2")
+        .withEventResponse("RESPONSE_2")
+        .withChallengeResponses(List.of(challenge3))
+        .withEventContextData(eventContextDataTypeTwo);
 
     AdminListUserAuthEventsResult result = new AdminListUserAuthEventsResult();
     result.setAuthEvents(List.of(authEventTypeOne, authEventTypeTwo));
