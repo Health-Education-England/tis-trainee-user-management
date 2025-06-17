@@ -25,7 +25,7 @@ import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import com.amazonaws.services.cognitoidp.model.ChallengeNameType;
 
 public enum MfaType {
-  NO_MFA, SMS, TOTP;
+  NO_MFA, SMS_MFA, SOFTWARE_TOKEN_MFA;
 
   /**
    * Get the MFA type from an {@link AdminGetUserResult}.
@@ -41,8 +41,8 @@ public enum MfaType {
     }
 
     return switch (ChallengeNameType.fromValue(preferredMfaSetting)) {
-      case SMS_MFA -> SMS;
-      case SOFTWARE_TOKEN_MFA -> TOTP;
+      case SMS_MFA -> SMS_MFA;
+      case SOFTWARE_TOKEN_MFA -> SOFTWARE_TOKEN_MFA;
       default -> throw new IllegalArgumentException(
           "Cannot create enum from " + preferredMfaSetting + " value!");
     };

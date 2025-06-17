@@ -21,7 +21,6 @@
 
 package uk.nhs.tis.trainee.usermanagement.service;
 
-import static com.amazonaws.services.cognitoidp.model.ChallengeNameType.SOFTWARE_TOKEN_MFA;
 import static com.amazonaws.services.cognitoidp.model.UserStatusType.CONFIRMED;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
@@ -37,8 +36,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
-import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SMS;
-import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.TOTP;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SMS_MFA;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SOFTWARE_TOKEN_MFA;
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
@@ -56,6 +55,7 @@ import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
 import com.amazonaws.services.cognitoidp.model.AdminUpdateUserAttributesRequest;
 import com.amazonaws.services.cognitoidp.model.AttributeType;
+import com.amazonaws.services.cognitoidp.model.ChallengeNameType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
@@ -131,7 +131,7 @@ class CognitoServiceTest {
     when(cognitoIdp.listUsers(requestCaptor.capture())).thenReturn(new ListUsersResult().withUsers(
         new UserType()
             .withAttributes(
-                new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS.toString())
+                new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS_MFA.toString())
             )
     ));
 
@@ -225,7 +225,7 @@ class CognitoServiceTest {
                 new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(EMAIL),
                 new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID)
             ))
-            .withPreferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
+            .withPreferredMfaSetting(ChallengeNameType.SOFTWARE_TOKEN_MFA.toString())
             .withUserCreateDate(Date.from(CREATED))
             .withUserStatus(CONFIRMED)
     );
@@ -234,7 +234,8 @@ class CognitoServiceTest {
 
     assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
     assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
-    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(), is(TOTP.toString()));
+    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
+        is(SOFTWARE_TOKEN_MFA.toString()));
     assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
     assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
     assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(),
@@ -244,18 +245,19 @@ class CognitoServiceTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      SMS_MFA            | SMS
-      SOFTWARE_TOKEN_MFA | TOTP
+      SMS_MFA            | SMS_MFA
+      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
-  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNotSet(String preferredMfa,
-      String mfaType) {
+  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNotSet(
+      ChallengeNameType preferredMfa, MfaType mfaType) {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(List.of())
     ));
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(
-        new AdminGetUserResult().withPreferredMfaSetting(preferredMfa)
+        new AdminGetUserResult().withPreferredMfaSetting(
+            preferredMfa == null ? null : preferredMfa.toString())
     );
 
     service.getUserDetails(USER_ID);
@@ -273,7 +275,7 @@ class CognitoServiceTest {
 
     AttributeType requestAttribute = requestAttributes.get(0);
     assertThat("Unexpected attribute name.", requestAttribute.getName(), is(ATTRIBUTE_MFA_TYPE));
-    assertThat("Unexpected attribute value.", requestAttribute.getValue(), is(mfaType));
+    assertThat("Unexpected attribute value.", requestAttribute.getValue(), is(mfaType.toString()));
   }
 
   @Test
@@ -292,7 +294,7 @@ class CognitoServiceTest {
                 new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(EMAIL),
                 new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID)
             ))
-            .withPreferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
+            .withPreferredMfaSetting(ChallengeNameType.SOFTWARE_TOKEN_MFA.toString())
             .withUserCreateDate(Date.from(CREATED))
             .withUserStatus(CONFIRMED)
     );
@@ -301,7 +303,8 @@ class CognitoServiceTest {
 
     assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
     assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
-    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(), is(TOTP.toString()));
+    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
+        is(SOFTWARE_TOKEN_MFA.toString()));
     assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
     assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
     assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(),
@@ -311,12 +314,12 @@ class CognitoServiceTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      SMS_MFA            | SMS
-      SOFTWARE_TOKEN_MFA | TOTP
+      SMS_MFA            | SMS_MFA
+      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
-  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNoMfa(String preferredMfa,
-      String mfaType) {
+  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNoMfa(ChallengeNameType preferredMfa,
+      MfaType mfaType) {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType()
             .withAttributes(
@@ -325,7 +328,8 @@ class CognitoServiceTest {
     ));
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(
-        new AdminGetUserResult().withPreferredMfaSetting(preferredMfa)
+        new AdminGetUserResult().withPreferredMfaSetting(
+            preferredMfa == null ? null : preferredMfa.toString())
     );
 
     service.getUserDetails(USER_ID);
@@ -343,7 +347,7 @@ class CognitoServiceTest {
 
     AttributeType requestAttribute = requestAttributes.get(0);
     assertThat("Unexpected attribute name.", requestAttribute.getName(), is(ATTRIBUTE_MFA_TYPE));
-    assertThat("Unexpected attribute value.", requestAttribute.getValue(), is(mfaType));
+    assertThat("Unexpected attribute value.", requestAttribute.getValue(), is(mfaType.toString()));
   }
 
   @ParameterizedTest
@@ -382,17 +386,18 @@ class CognitoServiceTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      SMS_MFA            | SMS
-      SOFTWARE_TOKEN_MFA | TOTP
+      SMS_MFA            | SMS_MFA
+      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
-  void shouldConvertAwsMfaPreferenceWhenGettingUserDetails(String preferredMfa, MfaType mfaType) {
+  void shouldConvertAwsMfaPreferenceWhenGettingUserDetails(ChallengeNameType preferredMfa,
+      MfaType mfaType) {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(List.of())
     ));
 
-    AdminGetUserResult result = new AdminGetUserResult()
-        .withPreferredMfaSetting(preferredMfa);
+    AdminGetUserResult result = new AdminGetUserResult().withPreferredMfaSetting(
+        preferredMfa == null ? null : preferredMfa.toString());
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
@@ -404,7 +409,7 @@ class CognitoServiceTest {
   void shouldReturnNoGroupsWhenUserNotFoundRetrievingGroups() {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(
-            new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS.toString())
+            new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS_MFA.toString())
         )
     ));
     when(cognitoIdp.adminListGroupsForUser(any())).thenThrow(UserNotFoundException.class);
@@ -422,7 +427,7 @@ class CognitoServiceTest {
 
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(
-            new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS.toString())
+            new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS_MFA.toString())
         )
     ));
     when(cognitoIdp.adminListGroupsForUser(any())).thenReturn(result);
@@ -442,7 +447,7 @@ class CognitoServiceTest {
 
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(
-            new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS.toString())
+            new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(SMS_MFA.toString())
         )
     ));
     when(cognitoIdp.adminListGroupsForUser(any())).thenReturn(result);

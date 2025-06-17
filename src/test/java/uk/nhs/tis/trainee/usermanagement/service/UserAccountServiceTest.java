@@ -38,7 +38,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
-import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.TOTP;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SOFTWARE_TOKEN_MFA;
 
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupResult;
@@ -328,7 +328,7 @@ class UserAccountServiceTest {
 
     UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
         .userStatus(CONFIRMED.toString())
-        .mfaStatus(TOTP.toString())
+        .mfaStatus(SOFTWARE_TOKEN_MFA.toString())
         .build();
     when(cognitoService.getUserDetails(any())).thenReturn(userDetails);
 
@@ -337,7 +337,7 @@ class UserAccountServiceTest {
     AdminDeleteUserRequest request = requestCaptor.getValue();
     assertThat("Unexpected user pool.", request.getUserPoolId(), is(USER_POOL_ID));
     assertThat("Unexpected delete account username.", request.getUsername(), is(EMAIL));
-    verify(metricsService).incrementDeleteAccountCounter(TOTP, CONFIRMED);
+    verify(metricsService).incrementDeleteAccountCounter(SOFTWARE_TOKEN_MFA, CONFIRMED);
   }
 
   @Test

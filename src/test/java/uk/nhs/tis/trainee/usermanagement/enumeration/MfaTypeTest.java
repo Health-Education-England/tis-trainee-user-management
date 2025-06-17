@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.ChallengeNameType;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -43,13 +44,13 @@ class MfaTypeTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      SMS_MFA            | SMS
-      SOFTWARE_TOKEN_MFA | TOTP
+      SMS_MFA            | SMS_MFA
+      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
-  void shouldReturnMfaTypeForValidPreferredMfa(String preferredMfa, MfaType expected) {
+  void shouldReturnMfaTypeForValidPreferredMfa(ChallengeNameType preferredMfa, MfaType expected) {
     AdminGetUserResult result = new AdminGetUserResult()
-        .withPreferredMfaSetting(preferredMfa);
+        .withPreferredMfaSetting(preferredMfa == null ? null : preferredMfa.toString());
 
     MfaType mfaType = MfaType.fromAdminGetUserResult(result);
 
