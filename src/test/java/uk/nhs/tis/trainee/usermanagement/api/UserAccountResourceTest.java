@@ -37,6 +37,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +54,8 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 @WebMvcTest(UserAccountResource.class)
 class UserAccountResourceTest {
 
-  private static final String USERNAME = "username";
+  private static final String ID = UUID.randomUUID().toString();
+  private static final String EMAIL = "user@example.com";
 
   @Autowired
   private MappingJackson2HttpMessageConverter jacksonMessageConverter;
@@ -74,12 +76,14 @@ class UserAccountResourceTest {
 
   @Test
   void shouldReturnExistenceFalseWhenUserAccountNotExists() throws Exception {
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto(USERNAME, "NO_ACCOUNT",
-        "NO_ACCOUNT", List.of(), null);
+    UserAccountDetailsDto userAccountDetails = UserAccountDetailsDto.builder()
+        .mfaStatus("NO_ACCOUNT")
+        .userStatus("NO_ACCOUNT")
+        .build();
 
-    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
+    when(service.getUserAccountDetails(EMAIL)).thenReturn(userAccountDetails);
 
-    mockMvc.perform(get("/api/user-account/exists/{username}", USERNAME)
+    mockMvc.perform(get("/api/user-account/exists/{username}", EMAIL)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.exists").isBoolean())
@@ -88,12 +92,17 @@ class UserAccountResourceTest {
 
   @Test
   void shouldReturnExistenceTrueWhenUserAccountExists() throws Exception {
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto(USERNAME, "MFA_STATUS",
-        "USER_STATUS", List.of(), Instant.now());
+    UserAccountDetailsDto userAccountDetails = UserAccountDetailsDto.builder()
+        .id(ID)
+        .email(EMAIL)
+        .mfaStatus("MFA_STATUS")
+        .userStatus("USER_STATUS")
+        .accountCreated(Instant.now())
+        .build();
 
-    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
+    when(service.getUserAccountDetails(EMAIL)).thenReturn(userAccountDetails);
 
-    mockMvc.perform(get("/api/user-account/exists/{username}", USERNAME)
+    mockMvc.perform(get("/api/user-account/exists/{username}", EMAIL)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.exists").isBoolean())
@@ -104,15 +113,23 @@ class UserAccountResourceTest {
   void shouldGetUserAccountDetails() throws Exception {
     List<String> groups = List.of("GROUP_1", "GROUP_2");
     Instant accountCreated = Instant.now();
-    UserAccountDetailsDto userAccountDetails = new UserAccountDetailsDto(USERNAME, "MFA_STATUS",
-        "USER_STATUS", groups, accountCreated);
 
-    when(service.getUserAccountDetails(USERNAME)).thenReturn(userAccountDetails);
+    UserAccountDetailsDto userAccountDetails = UserAccountDetailsDto.builder()
+        .id(ID)
+        .email(EMAIL)
+        .mfaStatus("MFA_STATUS")
+        .userStatus("USER_STATUS")
+        .groups(groups)
+        .accountCreated(accountCreated)
+        .build();
 
-    mockMvc.perform(get("/api/user-account/details/{username}", USERNAME)
+    when(service.getUserAccountDetails(EMAIL)).thenReturn(userAccountDetails);
+
+    mockMvc.perform(get("/api/user-account/details/{username}", EMAIL)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.username").value(USERNAME))
+        .andExpect(jsonPath("$.id").value(ID))
+        .andExpect(jsonPath("$.username").value(EMAIL))
         .andExpect(jsonPath("$.mfaStatus").value("MFA_STATUS"))
         .andExpect(jsonPath("$.userStatus").value("USER_STATUS"))
         .andExpect(jsonPath("$.groups").isArray())
@@ -138,9 +155,9 @@ class UserAccountResourceTest {
             "CHALLENGES",
             "DEVICE"));
 
-    when(service.getUserLoginDetails(USERNAME)).thenReturn(userLogins);
+    when(service.getUserLoginDetails(EMAIL)).thenReturn(userLogins);
 
-    mockMvc.perform(get("/api/user-account/logins/{username}", USERNAME)
+    mockMvc.perform(get("/api/user-account/logins/{username}", EMAIL)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$", hasSize(1)))
@@ -154,19 +171,19 @@ class UserAccountResourceTest {
 
   @Test
   void shouldResetMfa() throws Exception {
-    mockMvc.perform(post("/api/user-account/reset-mfa/{username}", USERNAME)
+    mockMvc.perform(post("/api/user-account/reset-mfa/{username}", EMAIL)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).resetUserAccountMfa(USERNAME);
+    verify(service).resetUserAccountMfa(EMAIL);
   }
 
   @Test
   void shouldDeleteCognitoAccount() throws Exception {
-    mockMvc.perform(delete("/api/user-account/{username}", USERNAME)
+    mockMvc.perform(delete("/api/user-account/{username}", EMAIL)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isNoContent());
 
-    verify(service).deleteCognitoAccount(USERNAME);
+    verify(service).deleteCognitoAccount(EMAIL);
   }
 }

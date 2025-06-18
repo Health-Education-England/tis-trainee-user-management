@@ -21,6 +21,30 @@
 
 package uk.nhs.tis.trainee.usermanagement.enumeration;
 
+import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import com.amazonaws.services.cognitoidp.model.ChallengeNameType;
+
 public enum MfaType {
-  NO_MFA, SMS, TOTP
+  NO_MFA, SMS_MFA, SOFTWARE_TOKEN_MFA;
+
+  /**
+   * Get the MFA type from an {@link AdminGetUserResult}.
+   *
+   * @param result The result to use.
+   * @return The MFA type.
+   */
+  public static MfaType fromAdminGetUserResult(AdminGetUserResult result) {
+    String preferredMfaSetting = result.getPreferredMfaSetting();
+
+    if (preferredMfaSetting == null) {
+      return NO_MFA;
+    }
+
+    return switch (ChallengeNameType.fromValue(preferredMfaSetting)) {
+      case SMS_MFA -> SMS_MFA;
+      case SOFTWARE_TOKEN_MFA -> SOFTWARE_TOKEN_MFA;
+      default -> throw new IllegalArgumentException(
+          "Cannot create enum from " + preferredMfaSetting + " value!");
+    };
+  }
 }

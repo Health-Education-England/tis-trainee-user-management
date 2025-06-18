@@ -21,23 +21,18 @@
 
 package uk.nhs.tis.trainee.usermanagement.service;
 
-import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
+import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
+
 import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
-import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminListGroupsForUserResult;
 import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsRequest;
 import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
 import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
-import com.amazonaws.services.cognitoidp.model.AdminUpdateUserAttributesRequest;
 import com.amazonaws.services.cognitoidp.model.AttributeType;
 import com.amazonaws.services.cognitoidp.model.AuthEventType;
 import com.amazonaws.services.cognitoidp.model.EventResponseType;
 import com.amazonaws.services.cognitoidp.model.EventType;
-import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
 import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
@@ -75,7 +70,6 @@ public class UserAccountService {
   private static final String USER_ID_CACHE = "UserId";
 
   private static final String NO_ACCOUNT = "NO_ACCOUNT";
-  private static final String NO_MFA = "NO_MFA";
   private static final Integer MAX_LOGIN_EVENTS = 10;
 
   private static final String ATTRIBUTE_EMAIL = "email";
@@ -86,7 +80,7 @@ public class UserAccountService {
 
   private final MetricsService metricsService;
 
-  private final AWSCognitoIdentityProvider cognitoIdp;
+  private final CognitoService cognitoService;
   private final String userPoolId;
   private final Cache cache;
 
@@ -94,11 +88,11 @@ public class UserAccountService {
 
   private Instant lastUserCaching = null;
 
-  UserAccountService(AWSCognitoIdentityProvider cognitoIdp,
+  UserAccountService(CognitoService cognitoService,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
       CacheManager cacheManager, EventPublishService eventPublishService,
       MetricsService metricsService) {
-    this.cognitoIdp = cognitoIdp;
+    this.cognitoService = cognitoService;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
     this.eventPublishService = eventPublishService;
@@ -106,37 +100,26 @@ public class UserAccountService {
   }
 
   /**
-   * Get the user account details for the account associated with the given username. Warning: this
-   * will contribute to monthly active user (MAU) count for the purposes of billing.
+   * Get the user account details for the account associated with the given username.
+   *
+   * <p><b>Warning</b>: this will contribute to monthly active user (MAU) count for the purposes of
+   * billing.
    *
    * @param username The username for the account.
    * @return The user account details.
    */
   public UserAccountDetailsDto getUserAccountDetails(String username) {
     log.info("Retrieving user with username '{}'.", username);
-    AdminGetUserRequest request = new AdminGetUserRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-
-    UserAccountDetailsDto userAccountDetails;
 
     try {
-      AdminGetUserResult result = cognitoIdp.adminGetUser(request);
-      String preferredMfa = result.getPreferredMfaSetting();
-
-      String mfaStatus = preferredMfa == null ? NO_MFA : preferredMfa;
-      Instant createdAt = null;
-      if (result.getUserCreateDate() != null) {
-        createdAt = result.getUserCreateDate().toInstant();
-      }
-      userAccountDetails = new UserAccountDetailsDto(result.getUsername(), mfaStatus,
-          result.getUserStatus(), getUserGroups(username), createdAt);
+      return cognitoService.getUserDetails(username);
     } catch (UserNotFoundException e) {
       log.info("User '{}' not found.", username);
-      userAccountDetails = new UserAccountDetailsDto(null, NO_ACCOUNT, NO_ACCOUNT, List.of(), null);
+      return UserAccountDetailsDto.builder()
+          .mfaStatus(NO_ACCOUNT)
+          .userStatus(NO_ACCOUNT)
+          .build();
     }
-
-    return userAccountDetails;
   }
 
   /**
@@ -157,12 +140,12 @@ public class UserAccountService {
 
     try {
       // Verify that the new email is not already used.
-      UserType existingUser = getUser(newEmail);
-      String existingUserId = existingUser.getUsername();
+      UserAccountDetailsDto existingUser = cognitoService.getUserDetails(newEmail);
+      String existingUserId = existingUser.getId();
 
       if (existingUserId.equals(userId)) {
         log.info("The email for this user has not changed, skipping email update.");
-        updateCognitoAttributes(userId, attributeTypes);
+        cognitoService.updateAttributes(userId, attributeTypes);
       } else {
         String message = String.format("The email '%s' is already in use by user '%s'.", newEmail,
             existingUserId);
@@ -170,22 +153,14 @@ public class UserAccountService {
       }
     } catch (UserNotFoundException e) {
       // If an existing user was not found then the new email address can be used.
-      UserType existingUser = getUser(userId);
-      final Optional<String> existingEmail = existingUser.getAttributes().stream()
-          .filter(ua -> ua.getName().equals(ATTRIBUTE_EMAIL))
-          .map(AttributeType::getValue)
-          .findFirst();
-      final Optional<String> traineeId = existingUser.getAttributes().stream()
-          .filter(ua -> ua.getName().equals(ATTRIBUTE_TIS_ID))
-          .map(AttributeType::getValue)
-          .findFirst();
-
       attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(newEmail));
       attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL_VERIFIED).withValue("true"));
-      updateCognitoAttributes(userId, attributeTypes);
+      cognitoService.updateAttributes(userId, attributeTypes);
 
-      eventPublishService.publishEmailUpdateEvent(userId, traineeId.orElse(null),
-          existingEmail.orElse(null), newEmail);
+      UserAccountDetailsDto existingUser = getUserAccountDetails(userId);
+      String traineeId = existingUser.getTraineeId();
+      String existingEmail = existingUser.getEmail();
+      eventPublishService.publishEmailUpdateEvent(userId, traineeId, existingEmail, newEmail);
       log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
     }
   }
@@ -206,7 +181,7 @@ public class UserAccountService {
     List<UserLoginDetailsDto> userLoginDetailsList;
 
     try {
-      AdminListUserAuthEventsResult result = cognitoIdp.adminListUserAuthEvents(request);
+      AdminListUserAuthEventsResult result = cognitoService.adminListUserAuthEvents(request);
       userLoginDetailsList = getLoginDetailsListFromAuthEvents(result);
 
     } catch (UserNotFoundException e) {
@@ -246,44 +221,26 @@ public class UserAccountService {
   }
 
   /**
-   * Get the groups for the given user.
-   *
-   * @param username The username for the account.
-   * @return A list of group names, or an empty list if the user was not found.
-   */
-  private List<String> getUserGroups(String username) {
-    log.info("Retrieving groups for username '{}'.", username);
-    AdminListGroupsForUserRequest request = new AdminListGroupsForUserRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-
-    try {
-      AdminListGroupsForUserResult result = cognitoIdp.adminListGroupsForUser(request);
-      return result.getGroups().stream()
-          .map(GroupType::getGroupName)
-          .toList();
-    } catch (UserNotFoundException e) {
-      log.info("User '{}' not found while retrieving groups.", username);
-      return List.of();
-    }
-  }
-
-  /**
    * Reset the MFA for the given user.
    *
    * @param username The username of the user.
    */
   public void resetUserAccountMfa(String username) {
     log.info("Resetting MFA for user '{}'.", username);
-    metricsService.incrementMfaResetCounter(getUserMfaType(username));
 
-    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
-    request.setSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false));
-    request.setSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
-    cognitoIdp.adminSetUserMFAPreference(request);
+    UserAccountDetailsDto user = cognitoService.getUserDetails(username);
+    MfaType mfaType = MfaType.valueOf(user.getMfaStatus());
+    metricsService.incrementMfaResetCounter(mfaType);
 
-    updateCognitoAttributes(username,
-        List.of(new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(NO_MFA)));
+    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest()
+        .withUserPoolId(userPoolId)
+        .withUsername(username)
+        .withSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false))
+        .withSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
+    cognitoService.adminSetUserMfaPreference(request);
+
+    cognitoService.updateAttributes(username,
+        List.of(new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(NO_MFA.toString())));
     log.info("MFA reset for user '{}'.", username);
   }
 
@@ -324,13 +281,13 @@ public class UserAccountService {
    */
   private String identifyMainAccount(String traineeId, Set<String> accountIds,
       String currentEmail) {
-    UserType currentEmailAccount = getUser(currentEmail);
-    String currentEmailUsername = currentEmailAccount.getUsername();
+    UserAccountDetailsDto currentEmailAccount = cognitoService.getUserDetails(currentEmail);
+    String currentEmailId = currentEmailAccount.getId();
 
-    if (currentEmailUsername != null && accountIds.contains(currentEmailUsername)) {
+    if (currentEmailId != null && accountIds.contains(currentEmailId)) {
       log.info("Found existing account {} for trainee {} matching current TIS email '{}'.",
-          currentEmailUsername, traineeId, currentEmail);
-      return currentEmailUsername;
+          currentEmailId, traineeId, currentEmail);
+      return currentEmailId;
     }
 
     for (String accountId : accountIds) {
@@ -360,7 +317,8 @@ public class UserAccountService {
           .withNextToken(paginationToken);
 
       try {
-        AdminListUserAuthEventsResult result = cognitoIdp.adminListUserAuthEvents(listAuthRequest);
+        AdminListUserAuthEventsResult result = cognitoService.adminListUserAuthEvents(
+            listAuthRequest);
 
         Optional<Date> lastSignIn = result.getAuthEvents().stream()
             .filter(event -> event.getEventType().equals(EventType.SignIn.toString()))
@@ -399,11 +357,12 @@ public class UserAccountService {
     request.setUserPoolId(userPoolId);
     request.setUsername(username);
 
-    MfaType oldMfaType = getUserMfaType(username);
-    UserStatusType userStatusType = getUserStatus(username);
+    UserAccountDetailsDto user = cognitoService.getUserDetails(username);
+    MfaType oldMfaType = MfaType.valueOf(user.getMfaStatus());
+    UserStatusType userStatusType = UserStatusType.valueOf(user.getUserStatus());
     metricsService.incrementDeleteAccountCounter(oldMfaType, userStatusType);
 
-    cognitoIdp.adminDeleteUser(request);
+    cognitoService.adminDeleteUser(request);
     log.info("Deleted Cognito account for user '{}'.", username);
   }
 
@@ -420,7 +379,7 @@ public class UserAccountService {
     request.setGroupName(groupName);
     request.setUsername(username);
 
-    cognitoIdp.adminAddUserToGroup(request);
+    cognitoService.adminAddUserToGroup(request);
     log.info("User '{}' has been enrolled to the {} group.", username, groupName);
   }
 
@@ -437,7 +396,7 @@ public class UserAccountService {
     request.setGroupName(groupName);
     request.setUsername(username);
 
-    cognitoIdp.adminRemoveUserFromGroup(request);
+    cognitoService.adminRemoveUserFromGroup(request);
     log.info("User '{}' has been withdrawn from the {} group.", username, groupName);
   }
 
@@ -479,7 +438,7 @@ public class UserAccountService {
       request.setPaginationToken(paginationToken);
 
       try {
-        ListUsersResult result = cognitoIdp.listUsers(request);
+        ListUsersResult result = cognitoService.listUsers(request);
         cacheUserAccountIds(result);
         paginationToken = result.getPaginationToken();
       } catch (TooManyRequestsException tmre) {
@@ -521,80 +480,5 @@ public class UserAccountService {
           ids.add(attr.get(ATTRIBUTE_SUB));
           cache.put(tisId, ids);
         });
-  }
-
-  /**
-   * Get a {@link UserType} for the given username.
-   *
-   * @param username The username to search for, should be an email or sub.
-   * @return The user matching the username.
-   * @throws UserNotFoundException If no users were found for the given username.
-   */
-  private UserType getUser(String username) throws UserNotFoundException {
-    String attribute = username.contains("@") ? ATTRIBUTE_EMAIL : ATTRIBUTE_SUB;
-    ListUsersRequest request = new ListUsersRequest()
-        .withUserPoolId(userPoolId)
-        .withFilter(String.format("%s=\"%s\"", attribute, username));
-
-    ListUsersResult result = cognitoIdp.listUsers(request);
-    List<UserType> users = result.getUsers();
-
-    if (users.isEmpty()) {
-      String message = String.format("User not found in user pool '%s' with the username '%s'.",
-          userPoolId, username);
-      throw new UserNotFoundException(message);
-    }
-
-    return users.get(0);
-  }
-
-  protected MfaType getUserMfaType(String username) {
-    AdminSetUserMFAPreferenceRequest request = getMfaPreferenceRequest(username);
-
-    if (request.getSoftwareTokenMfaSettings() == null) {
-      //should not happen
-      return MfaType.NO_MFA;
-    }
-    if (Boolean.TRUE.equals(request.getSoftwareTokenMfaSettings().getEnabled())) {
-      return MfaType.TOTP;
-    }
-    if (Boolean.TRUE.equals(request.getSMSMfaSettings().getEnabled())) {
-      return MfaType.SMS;
-    }
-    return MfaType.NO_MFA;
-  }
-
-  protected AdminSetUserMFAPreferenceRequest getMfaPreferenceRequest(String username) {
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-    return request;
-  }
-
-  /**
-   * Get the user status of the given user.
-   *
-   * @param username The username to get the status of.
-   * @return The user status type.
-   */
-  private UserStatusType getUserStatus(String username) {
-    UserType user = getUser(username);
-    return UserStatusType.valueOf(user.getUserStatus());
-  }
-
-  /**
-   * Update the user attributes on Cognito for the given user account.
-   *
-   * @param userId         The ID of the user account.
-   * @param attributeTypes The attributes to update.
-   */
-  private void updateCognitoAttributes(String userId, List<AttributeType> attributeTypes) {
-    AdminUpdateUserAttributesRequest updateRequest = new AdminUpdateUserAttributesRequest();
-    updateRequest.setUserPoolId(userPoolId);
-    updateRequest.setUsername(userId);
-
-    updateRequest.setUserAttributes(attributeTypes);
-    cognitoIdp.adminUpdateUserAttributes(updateRequest);
-    log.info("Attributes updated for user '{}'.", userId);
   }
 }
