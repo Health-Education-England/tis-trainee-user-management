@@ -77,8 +77,6 @@ class UserAccountResourceTest {
   @Test
   void shouldReturnExistenceFalseWhenUserAccountNotExists() throws Exception {
     UserAccountDetailsDto userAccountDetails = UserAccountDetailsDto.builder()
-        .id(ID)
-        .email(EMAIL)
         .mfaStatus("NO_ACCOUNT")
         .userStatus("NO_ACCOUNT")
         .build();
