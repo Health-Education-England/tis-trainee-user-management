@@ -281,8 +281,15 @@ public class UserAccountService {
    */
   private String identifyMainAccount(String traineeId, Set<String> accountIds,
       String currentEmail) {
-    UserAccountDetailsDto currentEmailAccount = cognitoService.getUserDetails(currentEmail);
-    String currentEmailId = currentEmailAccount.getId();
+    String currentEmailId = null;
+
+    try {
+      UserAccountDetailsDto currentEmailAccount = cognitoService.getUserDetails(currentEmail);
+      currentEmailId = currentEmailAccount.getId();
+    } catch (UserNotFoundException e) {
+      log.info("No existing account found for trainee {} matching current TIS email '{}'.",
+          traineeId, currentEmail);
+    }
 
     if (currentEmailId != null && accountIds.contains(currentEmailId)) {
       log.info("Found existing account {} for trainee {} matching current TIS email '{}'.",
