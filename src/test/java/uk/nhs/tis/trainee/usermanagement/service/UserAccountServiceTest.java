@@ -470,6 +470,76 @@ class UserAccountServiceTest {
   }
 
   @Test
+  void shouldNotDeleteDuplicatesWhenTisEmailNotFoundAndNoSuccessfulAuth() {
+    ArgumentCaptor<String> usernameCaptor = ArgumentCaptor.forClass(String.class);
+    when(cognitoService.getUserDetails(usernameCaptor.capture())).thenAnswer(inv -> {
+      String username = inv.getArgument(0);
+
+      return UserAccountDetailsDto.builder()
+          .id(username)
+          .email("no-match@example.com")
+          .traineeId(TRAINEE_ID_1)
+          .userStatus(CONFIRMED.toString())
+          .mfaStatus(NO_MFA.toString())
+          .build();
+    });
+    when(cognitoService.getUserDetails(EMAIL)).thenThrow(UserNotFoundException.class);
+
+    when(cognitoService.adminListUserAuthEvents(any())).thenReturn(
+        new AdminListUserAuthEventsResult()
+            .withAuthEvents(List.of())
+    );
+
+    Optional<String> accountId = service.deleteDuplicateAccounts(TRAINEE_ID_1,
+        Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
+
+    assertThat("Unexpected remaining account.", accountId, is(Optional.empty()));
+
+    String username = usernameCaptor.getAllValues().get(0);
+    assertThat("Unexpected username.", username, is(EMAIL));
+
+    verify(cognitoService, times(0)).adminDeleteUser(any());
+    verify(metricsService, times(0)).incrementDeleteAccountCounter(any(), any());
+  }
+
+  @Test
+  void shouldNotDeleteDuplicatesWhenTisEmailNotFoundAndSuccessfulAuth() {
+    ArgumentCaptor<String> usernameCaptor = ArgumentCaptor.forClass(String.class);
+    when(cognitoService.getUserDetails(usernameCaptor.capture())).thenAnswer(inv -> {
+      String username = inv.getArgument(0);
+
+      return UserAccountDetailsDto.builder()
+          .id(username)
+          .email("other.email@example.com")
+          .traineeId(TRAINEE_ID_1)
+          .userStatus(CONFIRMED.toString())
+          .build();
+    });
+    when(cognitoService.getUserDetails(EMAIL)).thenThrow(UserNotFoundException.class);
+
+    when(cognitoService.adminListUserAuthEvents(any())).thenReturn(
+        new AdminListUserAuthEventsResult()
+            .withAuthEvents(List.of(
+                new AuthEventType()
+                    .withCreationDate(Date.from(Instant.now()))
+                    .withEventType(EventType.SignIn)
+                    .withEventResponse(EventResponseType.Pass)
+            ))
+    );
+
+    Optional<String> accountId = service.deleteDuplicateAccounts(TRAINEE_ID_1,
+        Set.of(USER_ID_1, USER_ID_2, USER_ID_3), EMAIL);
+
+    assertThat("Unexpected remaining account.", accountId, is(Optional.empty()));
+
+    String username = usernameCaptor.getAllValues().get(0);
+    assertThat("Unexpected username.", username, is(EMAIL));
+
+    verify(cognitoService, times(0)).adminDeleteUser(any());
+    verify(metricsService, times(0)).incrementDeleteAccountCounter(any(), any());
+  }
+
+  @Test
   void shouldRetryPaginatingThroughAuthEventsWhenRateLimitedGettingAuthEvents() {
     when(cognitoService.getUserDetails(any())).thenAnswer(inv -> {
       String username = inv.getArgument(0);
