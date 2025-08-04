@@ -22,10 +22,9 @@
 package uk.nhs.tis.trainee.usermanagement.enumeration;
 
 import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
-import com.amazonaws.services.cognitoidp.model.ChallengeNameType;
 
 public enum MfaType {
-  NO_MFA, SMS_MFA, SOFTWARE_TOKEN_MFA;
+  EMAIL_OTP, NO_MFA, SMS_MFA, SOFTWARE_TOKEN_MFA;
 
   /**
    * Get the MFA type from an {@link AdminGetUserResult}.
@@ -40,11 +39,12 @@ public enum MfaType {
       return NO_MFA;
     }
 
-    return switch (ChallengeNameType.fromValue(preferredMfaSetting)) {
-      case SMS_MFA -> SMS_MFA;
-      case SOFTWARE_TOKEN_MFA -> SOFTWARE_TOKEN_MFA;
-      default -> throw new IllegalArgumentException(
+    // TODO: revert to check valid Cognito ChallengeNameType values once the SDK is upgraded.
+    if (preferredMfaSetting.equals(NO_MFA.toString())) {
+      throw new IllegalArgumentException(
           "Cannot create enum from " + preferredMfaSetting + " value!");
-    };
+    }
+
+    return MfaType.valueOf(preferredMfaSetting);
   }
 }

@@ -55,7 +55,6 @@ import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
 import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceResult;
 import com.amazonaws.services.cognitoidp.model.AdminUpdateUserAttributesRequest;
 import com.amazonaws.services.cognitoidp.model.AttributeType;
-import com.amazonaws.services.cognitoidp.model.ChallengeNameType;
 import com.amazonaws.services.cognitoidp.model.GroupType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
 import com.amazonaws.services.cognitoidp.model.ListUsersResult;
@@ -225,7 +224,7 @@ class CognitoServiceTest {
                 new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(EMAIL),
                 new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID)
             ))
-            .withPreferredMfaSetting(ChallengeNameType.SOFTWARE_TOKEN_MFA.toString())
+            .withPreferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
             .withUserCreateDate(Date.from(CREATED))
             .withUserStatus(CONFIRMED)
     );
@@ -245,19 +244,19 @@ class CognitoServiceTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+      EMAIL_OTP          | EMAIL_OTP
       SMS_MFA            | SMS_MFA
       SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
   void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNotSet(
-      ChallengeNameType preferredMfa, MfaType mfaType) {
+      String preferredMfa, MfaType mfaType) {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(List.of())
     ));
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(
-        new AdminGetUserResult().withPreferredMfaSetting(
-            preferredMfa == null ? null : preferredMfa.toString())
+        new AdminGetUserResult().withPreferredMfaSetting(preferredMfa)
     );
 
     service.getUserDetails(USER_ID);
@@ -294,7 +293,7 @@ class CognitoServiceTest {
                 new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(EMAIL),
                 new AttributeType().withName(ATTRIBUTE_TRAINEE_ID).withValue(TRAINEE_ID)
             ))
-            .withPreferredMfaSetting(ChallengeNameType.SOFTWARE_TOKEN_MFA.toString())
+            .withPreferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
             .withUserCreateDate(Date.from(CREATED))
             .withUserStatus(CONFIRMED)
     );
@@ -314,11 +313,12 @@ class CognitoServiceTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+      EMAIL_OTP          | EMAIL_OTP
       SMS_MFA            | SMS_MFA
       SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
-  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNoMfa(ChallengeNameType preferredMfa,
+  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNoMfa(String preferredMfa,
       MfaType mfaType) {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType()
@@ -328,8 +328,7 @@ class CognitoServiceTest {
     ));
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(
-        new AdminGetUserResult().withPreferredMfaSetting(
-            preferredMfa == null ? null : preferredMfa.toString())
+        new AdminGetUserResult().withPreferredMfaSetting(preferredMfa)
     );
 
     service.getUserDetails(USER_ID);
@@ -386,18 +385,17 @@ class CognitoServiceTest {
 
   @ParameterizedTest
   @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+      EMAIL_OTP          | EMAIL_OTP
       SMS_MFA            | SMS_MFA
       SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
       null               | NO_MFA
       """)
-  void shouldConvertAwsMfaPreferenceWhenGettingUserDetails(ChallengeNameType preferredMfa,
-      MfaType mfaType) {
+  void shouldConvertAwsMfaPreferenceWhenGettingUserDetails(String preferredMfa, MfaType mfaType) {
     when(cognitoIdp.listUsers(any())).thenReturn(new ListUsersResult().withUsers(
         new UserType().withAttributes(List.of())
     ));
 
-    AdminGetUserResult result = new AdminGetUserResult().withPreferredMfaSetting(
-        preferredMfa == null ? null : preferredMfa.toString());
+    AdminGetUserResult result = new AdminGetUserResult().withPreferredMfaSetting(preferredMfa);
 
     when(cognitoIdp.adminGetUser(any())).thenReturn(result);
 
