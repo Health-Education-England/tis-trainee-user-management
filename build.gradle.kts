@@ -1,12 +1,12 @@
 plugins {
   java
-  id("org.springframework.boot") version "3.3.1"
-  id("io.spring.dependency-management") version "1.1.5"
+  alias(libs.plugins.spring.boot)
+  alias(libs.plugins.spring.dependency.management)
 
   // Code quality plugins
   checkstyle
   jacoco
-  id("org.sonarqube") version "5.1.0.4882"
+  alias(libs.plugins.sonarqube)
 }
 
 group = "uk.nhs.tis.trainee"
@@ -18,22 +18,10 @@ configurations {
   }
 }
 
-repositories {
-  mavenCentral()
-
-  maven {
-    url = uri("https://hee-430723991443.d.codeartifact.eu-west-1.amazonaws.com/maven/Health-Education-England/")
-    credentials {
-      username = "aws"
-      password = System.getenv("CODEARTIFACT_AUTH_TOKEN")
-    }
-  }
-}
-
 dependencyManagement {
   imports {
-    mavenBom("io.awspring.cloud:spring-cloud-aws-dependencies:3.1.1")
-    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2023.0.2")
+    mavenBom(libs.spring.cloud.dependencies.aws.get().toString())
+    mavenBom(libs.spring.cloud.dependencies.core.get().toString())
     mavenBom("software.amazon.awssdk:bom:2.17.14")
   }
 }
@@ -55,21 +43,22 @@ dependencies {
   annotationProcessor("org.projectlombok:lombok")
 
   // MapStruct
-  val mapstructVersion = "1.6.2"
-  implementation("org.mapstruct:mapstruct:${mapstructVersion}")
-  annotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
-  testAnnotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
+  implementation(libs.mapstruct.core)
+  annotationProcessor(libs.mapstruct.processor)
+  testAnnotationProcessor(libs.mapstruct.processor)
 
   // Sentry reporting
-  val sentryVersion = "7.16.0"
-  implementation("io.sentry:sentry-spring-boot-starter-jakarta:$sentryVersion")
-  implementation("io.sentry:sentry-logback:$sentryVersion")
+  implementation(libs.bundles.sentry)
 
   // Amazon AWS
-  implementation("software.amazon.awssdk:cognitoidentityprovider")
   implementation("io.awspring.cloud:spring-cloud-aws-starter-sns")
   implementation("io.awspring.cloud:spring-cloud-aws-starter-sqs")
-  implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.16.0")
+  implementation("software.amazon.awssdk:cognitoidentityprovider")
+  implementation(libs.aws.xray.spring)
+
+  //Amazon Cloudwatch
+  implementation("io.micrometer:micrometer-core")
+  implementation("io.micrometer:micrometer-registry-cloudwatch2")
 
   //Amazon Cloudwatch
   implementation("io.micrometer:micrometer-core")
@@ -77,12 +66,8 @@ dependencies {
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
-  testImplementation("com.playtika.testcontainers:embedded-redis:3.1.7")
-  testImplementation("org.testcontainers:junit-jupiter:1.19.8")
-}
-
-checkstyle {
-  config = resources.text.fromArchiveEntry(configurations.checkstyle.get().first(), "google_checks.xml")
+  testImplementation("com.playtika.testcontainers:embedded-redis:3.1.15")
+  testImplementation("org.testcontainers:junit-jupiter")
 }
 
 java {
@@ -90,6 +75,10 @@ java {
     languageVersion.set(JavaLanguageVersion.of(17))
     vendor.set(JvmVendorSpec.ADOPTIUM)
   }
+}
+
+checkstyle {
+  config = resources.text.fromArchiveEntry(configurations.checkstyle.get().first(), "google_checks.xml")
 }
 
 sonarqube {
