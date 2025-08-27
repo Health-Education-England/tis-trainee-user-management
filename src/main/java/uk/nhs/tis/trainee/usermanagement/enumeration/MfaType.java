@@ -23,6 +23,9 @@ package uk.nhs.tis.trainee.usermanagement.enumeration;
 
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserResponse;
 
+/**
+ * An enumeration of allowed MFA types.
+ */
 public enum MfaType {
   EMAIL_OTP, NO_MFA, SMS_MFA, SOFTWARE_TOKEN_MFA;
 

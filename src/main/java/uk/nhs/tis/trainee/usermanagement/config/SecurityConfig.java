@@ -46,6 +46,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Security configuration.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableAutoConfiguration
@@ -67,11 +70,21 @@ public class SecurityConfig {
     this.authenticationProvider = authenticationProvider;
   }
 
+  /**
+   * Create an {@link AuthenticationManager} bean.
+   *
+   * @return The created bean.
+   */
   @Bean
   public AuthenticationManager authenticationManager() {
     return new ProviderManager(Collections.singletonList(authenticationProvider));
   }
 
+  /**
+   * Create an {@link JwtAuthenticationTokenFilter} bean.
+   *
+   * @return The created bean.
+   */
   @Bean
   public JwtAuthenticationTokenFilter authenticationTokenFilterBean() {
     JwtAuthenticationTokenFilter authenticationTokenFilter = new JwtAuthenticationTokenFilter(
@@ -82,6 +95,13 @@ public class SecurityConfig {
     return authenticationTokenFilter;
   }
 
+  /**
+   * Configure the security filter chain.
+   *
+   * @param http The HTTP Security object to configure.
+   * @return The built chain.
+   * @throws Exception If the configuration fails.
+   */
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http

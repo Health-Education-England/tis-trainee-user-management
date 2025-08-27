@@ -32,6 +32,9 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
+/**
+ * A mapper for creating generic user account details objects from Cognito results.
+ */
 @Mapper(componentModel = SPRING, imports = MfaType.class)
 public interface UserAccountDetailsMapper {
 

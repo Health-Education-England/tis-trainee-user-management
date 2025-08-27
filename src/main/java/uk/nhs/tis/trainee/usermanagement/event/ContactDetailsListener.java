@@ -29,6 +29,9 @@ import org.springframework.stereotype.Component;
 import uk.nhs.tis.trainee.usermanagement.dto.ContactDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
+/**
+ * A listener for contact details events.
+ */
 @Slf4j
 @Component
 public class ContactDetailsListener {

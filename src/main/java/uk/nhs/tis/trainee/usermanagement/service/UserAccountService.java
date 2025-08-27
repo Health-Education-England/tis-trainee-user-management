@@ -51,8 +51,6 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.EventRespon
 import software.amazon.awssdk.services.cognitoidentityprovider.model.EventType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.SMSMfaSettingsType;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.SoftwareTokenMfaSettingsType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.TooManyRequestsException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserStatusType;
@@ -61,6 +59,9 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
+/**
+ * A service for accessing user account data.
+ */
 @Slf4j
 @Service
 @XRayEnabled
@@ -236,8 +237,8 @@ public class UserAccountService {
     AdminSetUserMfaPreferenceRequest request = AdminSetUserMfaPreferenceRequest.builder()
         .userPoolId(userPoolId)
         .username(username)
-        .smsMfaSettings(SMSMfaSettingsType.builder().enabled(false).build())
-        .softwareTokenMfaSettings(SoftwareTokenMfaSettingsType.builder().enabled(false).build())
+        .smsMfaSettings(sms -> sms.enabled(false).build())
+        .softwareTokenMfaSettings(totp -> totp.enabled(false).build())
         .build();
     cognitoService.adminSetUserMfaPreference(request);
 

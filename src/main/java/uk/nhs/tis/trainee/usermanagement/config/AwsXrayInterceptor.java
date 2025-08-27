@@ -27,6 +27,9 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
+/**
+ * Interceptors for AWS XRay tracing.
+ */
 @Aspect
 @Component
 @ConditionalOnExpression("!T(org.springframework.util.StringUtils)"

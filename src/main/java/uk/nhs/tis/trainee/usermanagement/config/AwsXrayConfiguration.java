@@ -28,11 +28,20 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Configuration for AWS XRay tracing.
+ */
 @Configuration
 @ConditionalOnExpression("!T(org.springframework.util.StringUtils)"
     + ".isEmpty('${com.amazonaws.xray.emitters.daemon-address}')")
 public class AwsXrayConfiguration {
 
+  /**
+   * Create a tracing filter for HTTP requests.
+   *
+   * @param environment The current environment e.g. local or preprod.
+   * @return The tracing filter.
+   */
   @Bean
   public Filter tracingFilter(@Value("${application.environment}") String environment) {
     return new AWSXRayServletFilter("tis-trainee-user-management-" + environment);

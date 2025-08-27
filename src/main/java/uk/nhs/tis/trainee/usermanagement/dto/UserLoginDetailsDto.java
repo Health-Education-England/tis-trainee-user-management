@@ -24,6 +24,9 @@ package uk.nhs.tis.trainee.usermanagement.dto;
 import java.time.Instant;
 import lombok.Value;
 
+/**
+ * Details of a user login event.
+ */
 @Value
 public class UserLoginDetailsDto {
 
