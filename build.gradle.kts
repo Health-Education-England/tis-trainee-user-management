@@ -22,7 +22,6 @@ dependencyManagement {
   imports {
     mavenBom(libs.spring.cloud.dependencies.aws.get().toString())
     mavenBom(libs.spring.cloud.dependencies.core.get().toString())
-    mavenBom("software.amazon.awssdk:bom:2.17.14")
   }
 }
 

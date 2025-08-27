@@ -25,18 +25,19 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserResponse;
 
 class MfaTypeTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"INVALID", "NO_MFA", "MFA_SETUP"})
   void shouldThrowExceptionForInvalidPreferredMfa(String preferredMfa) {
-    AdminGetUserResult result = new AdminGetUserResult()
-        .withPreferredMfaSetting(preferredMfa);
+    AdminGetUserResponse result = AdminGetUserResponse.builder()
+        .preferredMfaSetting(preferredMfa)
+        .build();
 
     assertThrows(IllegalArgumentException.class, () -> MfaType.fromAdminGetUserResult(result));
   }
@@ -49,7 +50,9 @@ class MfaTypeTest {
       null               | NO_MFA
       """)
   void shouldReturnMfaTypeForValidPreferredMfa(String preferredMfa, MfaType expected) {
-    AdminGetUserResult result = new AdminGetUserResult().withPreferredMfaSetting(preferredMfa);
+    AdminGetUserResponse result = AdminGetUserResponse.builder()
+        .preferredMfaSetting(preferredMfa)
+        .build();
 
     MfaType mfaType = MfaType.fromAdminGetUserResult(result);
 

@@ -57,7 +57,7 @@ class TraineeProfileResourceTest {
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());
 
-    ArgumentCaptor<String> traineeIdCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<String> traineeIdCaptor = ArgumentCaptor.captor();
     verify(eventPublishService).publishSingleProfileSyncEvent(traineeIdCaptor.capture());
 
     assertThat("Unexpected traineeTisId.", traineeIdCaptor.getValue(), is(TRAINEE_ID));

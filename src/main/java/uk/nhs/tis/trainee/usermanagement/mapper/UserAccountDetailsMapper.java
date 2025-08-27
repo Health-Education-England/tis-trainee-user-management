@@ -23,13 +23,12 @@ package uk.nhs.tis.trainee.usermanagement.mapper;
 
 import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
 
-import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
-import com.amazonaws.services.cognitoidp.model.AttributeType;
-import com.amazonaws.services.cognitoidp.model.UserType;
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.Named;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
@@ -43,31 +42,31 @@ public interface UserAccountDetailsMapper {
    * @param groups Groups to associate with the user.
    * @return The converted DTO.
    */
-  @Mapping(target = "id", source = "user.attributes", qualifiedByName = "getId")
-  @Mapping(target = "email", source = "user.attributes", qualifiedByName = "getEmail")
-  @Mapping(target = "mfaStatus", source = "user.attributes", qualifiedByName = "getCustomMfaType")
-  @Mapping(target = "userStatus", source = "user.userStatus")
+  @Mapping(target = "id", expression = "java(getId(user.attributes()))")
+  @Mapping(target = "email", expression = "java(getEmail(user.attributes()))")
+  @Mapping(target = "mfaStatus", expression = "java(getCustomMfaType(user.attributes()))")
+  @Mapping(target = "userStatus", expression = "java(user.userStatusAsString())")
   @Mapping(target = "groups", source = "groups")
-  @Mapping(target = "accountCreated", source = "user.userCreateDate")
-  @Mapping(target = "traineeId", source = "user.attributes", qualifiedByName = "getTraineeId")
+  @Mapping(target = "accountCreated", expression = "java(user.userCreateDate())")
+  @Mapping(target = "traineeId", expression = "java(getTraineeId(user.attributes()))")
   UserAccountDetailsDto toDto(UserType user, List<String> groups);
 
   /**
-   * Convert a {@link AdminGetUserResult} to a {@link UserAccountDetailsDto}.
+   * Convert a {@link AdminGetUserResponse} to a {@link UserAccountDetailsDto}.
    *
    * @param result The result to convert.
    * @param groups Groups to associate with the user.
    * @return The converted DTO.
    */
-  @Mapping(target = "id", source = "result.userAttributes", qualifiedByName = "getId")
-  @Mapping(target = "email", source = "result.userAttributes", qualifiedByName = "getEmail")
+  @Mapping(target = "id", expression = "java(getId(result.userAttributes()))")
+  @Mapping(target = "email", expression = "java(getEmail(result.userAttributes()))")
   @Mapping(target = "mfaStatus",
       expression = "java(MfaType.fromAdminGetUserResult(result).toString())")
-  @Mapping(target = "userStatus", source = "result.userStatus")
+  @Mapping(target = "userStatus", expression = "java(result.userStatusAsString())")
   @Mapping(target = "groups", source = "groups")
-  @Mapping(target = "accountCreated", source = "result.userCreateDate")
-  @Mapping(target = "traineeId", source = "result.userAttributes", qualifiedByName = "getTraineeId")
-  UserAccountDetailsDto toDto(AdminGetUserResult result, List<String> groups);
+  @Mapping(target = "accountCreated", expression = "java(result.userCreateDate())")
+  @Mapping(target = "traineeId", expression = "java(getTraineeId(result.userAttributes()))")
+  UserAccountDetailsDto toDto(AdminGetUserResponse result, List<String> groups);
 
   /**
    * Get the user ID from the user attributes.
@@ -75,7 +74,6 @@ public interface UserAccountDetailsMapper {
    * @param attributes The attribute list.
    * @return The attribute value, or null if not found in the list.
    */
-  @Named("getId")
   default String getId(List<AttributeType> attributes) {
     return getAttribute("sub", attributes);
 
@@ -87,7 +85,6 @@ public interface UserAccountDetailsMapper {
    * @param attributes The attribute list.
    * @return The attribute value, or null if not found in the list.
    */
-  @Named("getEmail")
   default String getEmail(List<AttributeType> attributes) {
     return getAttribute("email", attributes);
   }
@@ -98,7 +95,6 @@ public interface UserAccountDetailsMapper {
    * @param attributes The attribute list.
    * @return The attribute value, or null if not found in the list.
    */
-  @Named("getCustomMfaType")
   default String getCustomMfaType(List<AttributeType> attributes) {
     return getAttribute("custom:mfaType", attributes);
   }
@@ -109,7 +105,6 @@ public interface UserAccountDetailsMapper {
    * @param attributes The attribute list.
    * @return The attribute value, or null if not found in the list.
    */
-  @Named("getTraineeId")
   default String getTraineeId(List<AttributeType> attributes) {
     return getAttribute("custom:tisId", attributes);
 
@@ -124,8 +119,8 @@ public interface UserAccountDetailsMapper {
    */
   default String getAttribute(String name, List<AttributeType> attributes) {
     return attributes == null ? null : attributes.stream()
-        .filter(ua -> ua.getName().equals(name))
-        .map(AttributeType::getValue)
+        .filter(ua -> ua.name().equals(name))
+        .map(AttributeType::value)
         .findAny()
         .orElse(null);
   }

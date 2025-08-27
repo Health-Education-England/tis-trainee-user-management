@@ -21,19 +21,19 @@
 
 package uk.nhs.tis.trainee.usermanagement.enumeration;
 
-import com.amazonaws.services.cognitoidp.model.AdminGetUserResult;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserResponse;
 
 public enum MfaType {
   EMAIL_OTP, NO_MFA, SMS_MFA, SOFTWARE_TOKEN_MFA;
 
   /**
-   * Get the MFA type from an {@link AdminGetUserResult}.
+   * Get the MFA type from an {@link AdminGetUserResponse}.
    *
    * @param result The result to use.
    * @return The MFA type.
    */
-  public static MfaType fromAdminGetUserResult(AdminGetUserResult result) {
-    String preferredMfaSetting = result.getPreferredMfaSetting();
+  public static MfaType fromAdminGetUserResult(AdminGetUserResponse result) {
+    String preferredMfaSetting = result.preferredMfaSetting();
 
     if (preferredMfaSetting == null) {
       return NO_MFA;

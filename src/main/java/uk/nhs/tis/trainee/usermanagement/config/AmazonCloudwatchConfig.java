@@ -48,7 +48,7 @@ public class AmazonCloudwatchConfig {
    * @param metricsNamespace The metrics namespace to use.
    */
   public AmazonCloudwatchConfig(
-      @Value("${cloud.aws.cloudwatch.namespace}") String metricsNamespace,
+      @Value("${spring.cloud.aws.cloudwatch.namespace}") String metricsNamespace,
       @Value("${application.environment}") String environment) {
     this.metricsNamespace = metricsNamespace;
     this.environment = environment;

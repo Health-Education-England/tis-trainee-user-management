@@ -21,14 +21,14 @@
 
 package uk.nhs.tis.trainee.usermanagement.dto;
 
-import java.util.Date;
+import java.time.Instant;
 import lombok.Value;
 
 @Value
 public class UserLoginDetailsDto {
 
   String eventId;
-  Date eventDate;
+  Instant eventDate;
   String event;
   String result;
   String challenges;

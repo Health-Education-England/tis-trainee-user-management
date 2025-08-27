@@ -1,5 +1,5 @@
 spring:
-:  data:
+  data:
     redis:
       host: ${embedded.redis.host}
       port: ${embedded.redis.port}
