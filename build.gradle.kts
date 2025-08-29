@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "2.4.0"
+version = "2.4.1"
 
 configurations {
   compileOnly {
@@ -33,7 +33,7 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-security")
 
   implementation("com.transformuk.hee:tis-security-jwt:6.0.0-SNAPSHOT")
-  implementation("com.transformuk.hee:profile-client:3.4.0") {
+  implementation("com.transformuk.hee:profile-client:3.4.1") {
     exclude("com.fasterxml.jackson.module", "jackson-module-jaxb-annotations")
   }
 
