@@ -34,8 +34,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -142,14 +140,12 @@ class UserAccountResourceTest {
   @Test
   void shouldGetUserLoginDetails() throws Exception {
     Instant eventInstant = Instant.now();
-    Date eventDate = Date.from(eventInstant);
-    DateTimeFormatter f = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSxxx");
-    String eventDateString = OffsetDateTime.ofInstant(eventInstant, ZoneOffset.UTC).format(f);
+    String eventDateString = OffsetDateTime.ofInstant(eventInstant, ZoneOffset.UTC).toString();
 
     List<UserLoginDetailsDto> userLogins = List.of(
         new UserLoginDetailsDto(
             "EVENT_ID",
-            eventDate,
+            eventInstant,
             "EVENT",
             "RESULT",
             "CHALLENGES",

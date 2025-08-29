@@ -23,29 +23,10 @@ package uk.nhs.tis.trainee.usermanagement.service;
 
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
 
-import com.amazonaws.services.cognitoidp.model.AdminAddUserToGroupRequest;
-import com.amazonaws.services.cognitoidp.model.AdminDeleteUserRequest;
-import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsRequest;
-import com.amazonaws.services.cognitoidp.model.AdminListUserAuthEventsResult;
-import com.amazonaws.services.cognitoidp.model.AdminRemoveUserFromGroupRequest;
-import com.amazonaws.services.cognitoidp.model.AdminSetUserMFAPreferenceRequest;
-import com.amazonaws.services.cognitoidp.model.AttributeType;
-import com.amazonaws.services.cognitoidp.model.AuthEventType;
-import com.amazonaws.services.cognitoidp.model.EventResponseType;
-import com.amazonaws.services.cognitoidp.model.EventType;
-import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
-import com.amazonaws.services.cognitoidp.model.ListUsersResult;
-import com.amazonaws.services.cognitoidp.model.SMSMfaSettingsType;
-import com.amazonaws.services.cognitoidp.model.SoftwareTokenMfaSettingsType;
-import com.amazonaws.services.cognitoidp.model.TooManyRequestsException;
-import com.amazonaws.services.cognitoidp.model.UserNotFoundException;
-import com.amazonaws.services.cognitoidp.model.UserStatusType;
-import com.amazonaws.services.cognitoidp.model.UserType;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -58,10 +39,29 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminDeleteUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminListUserAuthEventsRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminListUserAuthEventsResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminRemoveUserFromGroupRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminSetUserMfaPreferenceRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthEventType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.EventResponseType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.EventType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.TooManyRequestsException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserStatusType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
+/**
+ * A service for accessing user account data.
+ */
 @Slf4j
 @Service
 @XRayEnabled
@@ -135,8 +135,8 @@ public class UserAccountService {
     log.info("Updating email to '{}' for user '{}'.", newEmail, userId);
 
     List<AttributeType> attributeTypes = new ArrayList<>();
-    attributeTypes.add(new AttributeType().withName("family_name").withValue(surname));
-    attributeTypes.add(new AttributeType().withName("given_name").withValue(forenames));
+    attributeTypes.add(AttributeType.builder().name("family_name").value(surname).build());
+    attributeTypes.add(AttributeType.builder().name("given_name").value(forenames).build());
 
     try {
       // Verify that the new email is not already used.
@@ -153,8 +153,9 @@ public class UserAccountService {
       }
     } catch (UserNotFoundException e) {
       // If an existing user was not found then the new email address can be used.
-      attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL).withValue(newEmail));
-      attributeTypes.add(new AttributeType().withName(ATTRIBUTE_EMAIL_VERIFIED).withValue("true"));
+      attributeTypes.add(AttributeType.builder().name(ATTRIBUTE_EMAIL).value(newEmail).build());
+      attributeTypes.add(
+          AttributeType.builder().name(ATTRIBUTE_EMAIL_VERIFIED).value("true").build());
       cognitoService.updateAttributes(userId, attributeTypes);
 
       UserAccountDetailsDto existingUser = getUserAccountDetails(userId);
@@ -173,15 +174,16 @@ public class UserAccountService {
    */
   public List<UserLoginDetailsDto> getUserLoginDetails(String username) {
     log.info("Retrieving login events for user with username '{}'.", username);
-    AdminListUserAuthEventsRequest request = new AdminListUserAuthEventsRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
-    request.setMaxResults(MAX_LOGIN_EVENTS); //results are sorted in descending CreationDate order
+    AdminListUserAuthEventsRequest request = AdminListUserAuthEventsRequest.builder()
+        .userPoolId(userPoolId)
+        .username(username)
+        .maxResults(MAX_LOGIN_EVENTS) //results are sorted in descending CreationDate order
+        .build();
 
     List<UserLoginDetailsDto> userLoginDetailsList;
 
     try {
-      AdminListUserAuthEventsResult result = cognitoService.adminListUserAuthEvents(request);
+      AdminListUserAuthEventsResponse result = cognitoService.adminListUserAuthEvents(request);
       userLoginDetailsList = getLoginDetailsListFromAuthEvents(result);
 
     } catch (UserNotFoundException e) {
@@ -199,18 +201,18 @@ public class UserAccountService {
    * @return the list of UserLoginDetailsDtos, or an empty list if no auth events exist.
    */
   private List<UserLoginDetailsDto> getLoginDetailsListFromAuthEvents(
-      AdminListUserAuthEventsResult authEventsResult) {
+      AdminListUserAuthEventsResponse authEventsResult) {
     List<UserLoginDetailsDto> userLoginDetailsList = new ArrayList<>();
-    List<AuthEventType> authEvents = authEventsResult.getAuthEvents();
+    List<AuthEventType> authEvents = authEventsResult.authEvents();
 
     authEvents.forEach(authEvent -> {
-      String eventId = authEvent.getEventId();
-      Date eventDate = authEvent.getCreationDate();
-      String event = authEvent.getEventType();
-      String eventResult = authEvent.getEventResponse();
-      String device = authEvent.getEventContextData().getDeviceName();
-      String challenges = authEvent.getChallengeResponses().stream()
-          .map(it -> it.getChallengeName() + ":" + it.getChallengeResponse())
+      String eventId = authEvent.eventId();
+      Instant eventDate = authEvent.creationDate();
+      String event = authEvent.eventTypeAsString();
+      String eventResult = authEvent.eventResponseAsString();
+      String device = authEvent.eventContextData().deviceName();
+      String challenges = authEvent.challengeResponses().stream()
+          .map(it -> it.challengeName() + ":" + it.challengeResponse())
           .collect(Collectors.joining(", "));
 
       UserLoginDetailsDto eventDto
@@ -232,15 +234,16 @@ public class UserAccountService {
     MfaType mfaType = MfaType.valueOf(user.getMfaStatus());
     metricsService.incrementMfaResetCounter(mfaType);
 
-    AdminSetUserMFAPreferenceRequest request = new AdminSetUserMFAPreferenceRequest()
-        .withUserPoolId(userPoolId)
-        .withUsername(username)
-        .withSMSMfaSettings(new SMSMfaSettingsType().withEnabled(false))
-        .withSoftwareTokenMfaSettings(new SoftwareTokenMfaSettingsType().withEnabled(false));
+    AdminSetUserMfaPreferenceRequest request = AdminSetUserMfaPreferenceRequest.builder()
+        .userPoolId(userPoolId)
+        .username(username)
+        .smsMfaSettings(sms -> sms.enabled(false).build())
+        .softwareTokenMfaSettings(totp -> totp.enabled(false).build())
+        .build();
     cognitoService.adminSetUserMfaPreference(request);
 
     cognitoService.updateAttributes(username,
-        List.of(new AttributeType().withName(ATTRIBUTE_MFA_TYPE).withValue(NO_MFA.toString())));
+        List.of(AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(NO_MFA.toString()).build()));
     log.info("MFA reset for user '{}'.", username);
   }
 
@@ -318,25 +321,26 @@ public class UserAccountService {
     String paginationToken = null;
 
     do {
-      AdminListUserAuthEventsRequest listAuthRequest = new AdminListUserAuthEventsRequest()
-          .withUserPoolId(userPoolId)
-          .withUsername(username)
-          .withNextToken(paginationToken);
+      AdminListUserAuthEventsRequest listAuthRequest = AdminListUserAuthEventsRequest.builder()
+          .userPoolId(userPoolId)
+          .username(username)
+          .nextToken(paginationToken)
+          .build();
 
       try {
-        AdminListUserAuthEventsResult result = cognitoService.adminListUserAuthEvents(
+        AdminListUserAuthEventsResponse result = cognitoService.adminListUserAuthEvents(
             listAuthRequest);
 
-        Optional<Date> lastSignIn = result.getAuthEvents().stream()
-            .filter(event -> event.getEventType().equals(EventType.SignIn.toString()))
-            .filter(event -> event.getEventResponse().equals(EventResponseType.Pass.toString()))
-            .map(AuthEventType::getCreationDate)
+        Optional<Instant> lastSignIn = result.authEvents().stream()
+            .filter(event -> event.eventType().equals(EventType.SIGN_IN))
+            .filter(event -> event.eventResponse().equals(EventResponseType.PASS))
+            .map(AuthEventType::creationDate)
             .findFirst();
 
         if (lastSignIn.isPresent()) {
-          return lastSignIn.get().toInstant();
+          return lastSignIn.get();
         } else {
-          paginationToken = result.getNextToken();
+          paginationToken = result.nextToken();
         }
       } catch (TooManyRequestsException tmre) {
         try {
@@ -360,9 +364,10 @@ public class UserAccountService {
    */
   public void deleteCognitoAccount(String username) {
     log.info("Deleting the Cognito account for user '{}'.", username);
-    AdminDeleteUserRequest request = new AdminDeleteUserRequest();
-    request.setUserPoolId(userPoolId);
-    request.setUsername(username);
+    AdminDeleteUserRequest request = AdminDeleteUserRequest.builder()
+        .userPoolId(userPoolId)
+        .username(username)
+        .build();
 
     UserAccountDetailsDto user = cognitoService.getUserDetails(username);
     MfaType oldMfaType = MfaType.valueOf(user.getMfaStatus());
@@ -381,10 +386,11 @@ public class UserAccountService {
    */
   public void enrollToUserGroup(String username, String groupName) {
     log.info("Enrolling user '{}' to the '{}' group.", username, groupName);
-    AdminAddUserToGroupRequest request = new AdminAddUserToGroupRequest();
-    request.setUserPoolId(userPoolId);
-    request.setGroupName(groupName);
-    request.setUsername(username);
+    AdminAddUserToGroupRequest request = AdminAddUserToGroupRequest.builder()
+        .userPoolId(userPoolId)
+        .groupName(groupName)
+        .username(username)
+        .build();
 
     cognitoService.adminAddUserToGroup(request);
     log.info("User '{}' has been enrolled to the {} group.", username, groupName);
@@ -398,10 +404,11 @@ public class UserAccountService {
    */
   public void withdrawFromUserGroup(String username, String groupName) {
     log.info("Withdrawing user '{}' from the '{}' group.", username, groupName);
-    AdminRemoveUserFromGroupRequest request = new AdminRemoveUserFromGroupRequest();
-    request.setUserPoolId(userPoolId);
-    request.setGroupName(groupName);
-    request.setUsername(username);
+    AdminRemoveUserFromGroupRequest request = AdminRemoveUserFromGroupRequest.builder()
+        .userPoolId(userPoolId)
+        .groupName(groupName)
+        .username(username)
+        .build();
 
     cognitoService.adminRemoveUserFromGroup(request);
     log.info("User '{}' has been withdrawn from the {} group.", username, groupName);
@@ -440,14 +447,15 @@ public class UserAccountService {
     String paginationToken = null;
 
     do {
-      ListUsersRequest request = new ListUsersRequest();
-      request.setUserPoolId(userPoolId);
-      request.setPaginationToken(paginationToken);
+      ListUsersRequest request = ListUsersRequest.builder()
+          .userPoolId(userPoolId)
+          .paginationToken(paginationToken)
+          .build();
 
       try {
-        ListUsersResult result = cognitoService.listUsers(request);
+        ListUsersResponse result = cognitoService.listUsers(request);
         cacheUserAccountIds(result);
-        paginationToken = result.getPaginationToken();
+        paginationToken = result.paginationToken();
       } catch (TooManyRequestsException tmre) {
         try {
           // Cognito requests are limited to 5 per second.
@@ -470,11 +478,11 @@ public class UserAccountService {
    *
    * @param result The result of a ListUsersRequest.
    */
-  private void cacheUserAccountIds(ListUsersResult result) {
-    result.getUsers().stream()
-        .map(UserType::getAttributes)
+  private void cacheUserAccountIds(ListUsersResponse result) {
+    result.users().stream()
+        .map(UserType::attributes)
         .map(attributes -> attributes.stream()
-            .collect(Collectors.toMap(AttributeType::getName, AttributeType::getValue))
+            .collect(Collectors.toMap(AttributeType::name, AttributeType::value))
         )
         .forEach(attr -> {
           String tisId = attr.get(ATTRIBUTE_TIS_ID);

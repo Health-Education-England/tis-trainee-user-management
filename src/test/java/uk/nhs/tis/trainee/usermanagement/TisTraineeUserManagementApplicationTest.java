@@ -21,7 +21,8 @@
 
 package uk.nhs.tis.trainee.usermanagement;
 
-import io.awspring.cloud.messaging.core.NotificationMessagingTemplate;
+import io.awspring.cloud.sns.core.SnsTemplate;
+import io.awspring.cloud.sqs.operations.SqsTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -32,7 +33,10 @@ import org.springframework.test.context.ActiveProfiles;
 class TisTraineeUserManagementApplicationTest {
 
   @MockBean
-  private NotificationMessagingTemplate template;
+  private SnsTemplate snsTemplate;
+
+  @MockBean
+  private SqsTemplate sqsTemplate;
 
   @Test
   void contextLoads() {

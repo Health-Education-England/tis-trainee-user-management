@@ -33,7 +33,6 @@ import static uk.nhs.tis.trainee.usermanagement.service.MetricsService.METRIC_RE
 import static uk.nhs.tis.trainee.usermanagement.service.MetricsService.TAG_MFA;
 import static uk.nhs.tis.trainee.usermanagement.service.MetricsService.TAG_USER_STATUS;
 
-import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -48,6 +47,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserStatusType;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
 class MetricsServiceTest {

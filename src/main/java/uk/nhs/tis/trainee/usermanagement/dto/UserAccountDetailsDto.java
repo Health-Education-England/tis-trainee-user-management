@@ -27,6 +27,9 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
+/**
+ * Details of a user account.
+ */
 @Builder
 @Value
 public class UserAccountDetailsDto {

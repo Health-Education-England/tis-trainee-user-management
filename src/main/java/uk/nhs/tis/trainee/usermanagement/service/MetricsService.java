@@ -21,13 +21,13 @@
 
 package uk.nhs.tis.trainee.usermanagement.service;
 
-import com.amazonaws.services.cognitoidp.model.UserStatusType;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.EnumMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserStatusType;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 
 /**
@@ -36,6 +36,7 @@ import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 @Service
 @Slf4j
 public class MetricsService {
+
   protected static final String METRIC_NAME_MFA_RESET = "account.mfa.reset";
   protected static final String METRIC_NAME_ACCOUNT_DELETE = "account.delete";
   protected static final String METRIC_RESYNC = "data.resync";

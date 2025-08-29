@@ -1,16 +1,16 @@
 plugins {
   java
-  id("org.springframework.boot") version "2.7.5"
-  id("io.spring.dependency-management") version "1.1.4"
+  alias(libs.plugins.spring.boot)
+  alias(libs.plugins.spring.dependency.management)
 
   // Code quality plugins
   checkstyle
   jacoco
-  id("org.sonarqube") version "5.1.0.4882"
+  alias(libs.plugins.sonarqube)
 }
 
 group = "uk.nhs.tis.trainee"
-version = "2.3.2"
+version = "2.4.0"
 
 configurations {
   compileOnly {
@@ -18,23 +18,10 @@ configurations {
   }
 }
 
-repositories {
-  mavenCentral()
-
-  maven {
-    url = uri("https://hee-430723991443.d.codeartifact.eu-west-1.amazonaws.com/maven/Health-Education-England/")
-    credentials {
-      username = "aws"
-      password = System.getenv("CODEARTIFACT_AUTH_TOKEN")
-    }
-  }
-}
-
 dependencyManagement {
   imports {
-    mavenBom("org.springframework.cloud:spring-cloud-dependencies:2021.0.8")
-    mavenBom("io.awspring.cloud:spring-cloud-aws-dependencies:2.4.4")
-    mavenBom("software.amazon.awssdk:bom:2.17.14")
+    mavenBom(libs.spring.cloud.dependencies.aws.get().toString())
+    mavenBom(libs.spring.cloud.dependencies.core.get().toString())
   }
 }
 
@@ -44,42 +31,42 @@ dependencies {
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-security")
-  testImplementation("org.springframework.boot:spring-boot-starter-test")
 
-  implementation("com.transformuk.hee:tis-security-jwt:5.1.4")
-  implementation("com.transformuk.hee:profile-client:3.1.1")
+  implementation("com.transformuk.hee:tis-security-jwt:6.0.0-SNAPSHOT")
+  implementation("com.transformuk.hee:profile-client:3.4.0") {
+    exclude("com.fasterxml.jackson.module", "jackson-module-jaxb-annotations")
+  }
 
   // Lombok
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
 
   // MapStruct
-  val mapstructVersion = "1.6.2"
-  implementation("org.mapstruct:mapstruct:${mapstructVersion}")
-  annotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
-  testAnnotationProcessor("org.mapstruct:mapstruct-processor:${mapstructVersion}")
+  implementation(libs.mapstruct.core)
+  annotationProcessor(libs.mapstruct.processor)
+  testAnnotationProcessor(libs.mapstruct.processor)
 
   // Sentry reporting
-  val sentryVersion = "7.16.0"
-  implementation("io.sentry:sentry-spring-boot-starter:$sentryVersion")
-  implementation("io.sentry:sentry-logback:$sentryVersion")
+  implementation(libs.bundles.sentry)
 
   // Amazon AWS
-  implementation("com.amazonaws:aws-java-sdk-cognitoidp")
-  implementation("io.awspring.cloud:spring-cloud-starter-aws-messaging")
-  implementation("com.amazonaws:aws-xray-recorder-sdk-spring:2.15.1")
+  implementation("io.awspring.cloud:spring-cloud-aws-starter-sns")
+  implementation("io.awspring.cloud:spring-cloud-aws-starter-sqs")
+  implementation("software.amazon.awssdk:cognitoidentityprovider")
+  implementation(libs.aws.xray.spring)
 
   //Amazon Cloudwatch
   implementation("io.micrometer:micrometer-core")
   implementation("io.micrometer:micrometer-registry-cloudwatch2")
 
-  testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
-  testImplementation("com.playtika.testcontainers:embedded-redis:2.3.6")
-  testImplementation("org.testcontainers:junit-jupiter:1.19.7")
-}
+  //Amazon Cloudwatch
+  implementation("io.micrometer:micrometer-core")
+  implementation("io.micrometer:micrometer-registry-cloudwatch2")
 
-checkstyle {
-  config = resources.text.fromArchiveEntry(configurations.checkstyle.get().first(), "google_checks.xml")
+  testImplementation("org.springframework.boot:spring-boot-starter-test")
+  testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
+  testImplementation("com.playtika.testcontainers:embedded-redis:3.1.15")
+  testImplementation("org.testcontainers:junit-jupiter")
 }
 
 java {
@@ -87,6 +74,10 @@ java {
     languageVersion.set(JavaLanguageVersion.of(17))
     vendor.set(JvmVendorSpec.ADOPTIUM)
   }
+}
+
+checkstyle {
+  config = resources.text.fromArchiveEntry(configurations.checkstyle.get().first(), "google_checks.xml")
 }
 
 sonarqube {
