@@ -64,7 +64,6 @@ class EventPublishServiceTest {
 
   @Test
   void shouldPublishProfileSyncEvent() {
-    // TODO: figure out how to make this test work.
     eventPublishService.publishSingleProfileSyncEvent(TRAINEE_ID);
 
     ArgumentCaptor<Message<DataRequestEvent>> messageCaptor = ArgumentCaptor.captor();
