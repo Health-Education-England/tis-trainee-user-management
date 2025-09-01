@@ -31,13 +31,15 @@ spring:
         static: ${AWS_REGION}
       cloudwatch:
         namespace: TIS/Trainee/UserManagement
-  redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
-    ssl: ${REDIS_SSL:false}
-    username: ${REDIS_USERNAME:default}
-    password: ${REDIS_PASSWORD:password}
-    timeout: 60000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      username: ${REDIS_USERNAME:default}
+      password: ${REDIS_PASSWORD:password}
+      timeout: 60000
 
 profile:
   server:
