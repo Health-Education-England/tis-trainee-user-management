@@ -35,6 +35,7 @@ import org.springframework.messaging.support.GenericMessage;
 import org.springframework.stereotype.Service;
 import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
+import uk.nhs.tis.trainee.usermanagement.event.ProfileMoveEvent;
 
 /**
  * A service to publish events to SQS.
@@ -49,17 +50,20 @@ public class EventPublishService {
 
   private final SnsTemplate notificationMessagingTemplate;
   private final SqsTemplate queueMessagingTemplate;
+  private final String profileMoveTopicArn;
   private final String userAccountUpdateTopicArn;
   private final String queueUrl;
   private final MetricsService metricsService;
 
   EventPublishService(SnsTemplate notificationMessagingTemplate,
       @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
+      @Value("${application.aws.sns.profile-move.request}") String profileMoveTopicArn,
       SqsTemplate queueMessagingTemplate,
       @Value("${application.aws.sqs.request}") String requestQueueUrl,
       MetricsService metricsService) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
     this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
+    this.profileMoveTopicArn = profileMoveTopicArn;
     this.queueMessagingTemplate = queueMessagingTemplate;
     this.queueUrl = requestQueueUrl;
     this.metricsService = metricsService;
@@ -101,6 +105,26 @@ public class EventPublishService {
     notificationMessagingTemplate.convertAndSend(userAccountUpdateTopicArn, event, Map.of(
         NOTIFICATION_SUBJECT_HEADER, "Account Email Updated",
         MESSAGE_GROUP_ID_HEADER, userId,
+        "producer", "tis-trainee-user-management"
+    ));
+  }
+
+  /**
+   * Publish a move profile data event.
+   *
+   * @param fromTisId The TIS ID of the trainee to move data from.
+   * @param toTisId   The TIS ID of the trainee to move data to.
+   */
+  public void publishProfileMoveEvent(String fromTisId, String toTisId) {
+    log.info("Sending move profile data event from trainee {} to trainee {}", fromTisId, toTisId);
+
+    ProfileMoveEvent event = new ProfileMoveEvent(fromTisId, toTisId);
+
+    String messageGroupId = String.format("%s_%s", fromTisId, toTisId);
+
+    notificationMessagingTemplate.convertAndSend(profileMoveTopicArn, event, Map.of(
+        NOTIFICATION_SUBJECT_HEADER, "Profile Data Move",
+        MESSAGE_GROUP_ID_HEADER, messageGroupId,
         "producer", "tis-trainee-user-management"
     ));
   }
