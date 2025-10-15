@@ -109,7 +109,7 @@ public class SecurityConfig {
         .csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(POST, "/api/trainee-profile/move/**")
-              .hasRole("TSS_DATA_ADMIN")
+              .hasAuthority("ROLE_TSS Data Admin")
             .requestMatchers(GET, "/api/user-account/exists/*").authenticated()
             .requestMatchers(GET, API_PATH).hasAuthority("trainee-support:view")
             .requestMatchers(POST, API_PATH).hasAuthority("trainee-support:modify")
