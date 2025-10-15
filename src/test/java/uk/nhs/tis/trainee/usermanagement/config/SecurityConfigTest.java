@@ -67,7 +67,7 @@ class SecurityConfigTest {
 
   @Test
   void shouldAllowTssDataAdminToAccessMoveEndpoint() throws Exception {
-    mockMvc.perform(post("/api/trainee-profile/move/123/to/456")
+    mockMvc.perform(post("/api/trainee-profile/move/123/456")
             .contentType(MediaType.APPLICATION_JSON)
             .header("Authorization", "Bearer admin-token"))
         .andExpect(status().isOk());
@@ -75,7 +75,7 @@ class SecurityConfigTest {
 
   @Test
   void shouldDenyAccessToMoveEndpointWithoutTssDataAdminRole() throws Exception {
-    mockMvc.perform(post("/api/trainee-profile/move/123/to/456")
+    mockMvc.perform(post("/api/trainee-profile/move/123/456")
             .contentType(MediaType.APPLICATION_JSON)
             .header("Authorization", "Bearer user-token"))
         .andExpect(status().isForbidden());
@@ -83,7 +83,7 @@ class SecurityConfigTest {
 
   @Test
   void shouldDenyAnonymousAccessToMoveEndpoint() throws Exception {
-    mockMvc.perform(post("/api/trainee-profile/move/123/to/456")
+    mockMvc.perform(post("/api/trainee-profile/move/123/456")
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isUnauthorized());
   }

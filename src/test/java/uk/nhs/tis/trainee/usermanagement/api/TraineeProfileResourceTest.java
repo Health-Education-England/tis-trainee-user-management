@@ -67,7 +67,7 @@ class TraineeProfileResourceTest {
   @Test
   void shouldTriggerProfileMove() throws Exception {
 
-    mockMvc.perform(post("/api/trainee-profile/move/{fromTraineeId}/to/{toTraineeId}",
+    mockMvc.perform(post("/api/trainee-profile/move/{fromTraineeId}/{toTraineeId}",
             TRAINEE_ID, TO_TRAINEE_ID)
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());

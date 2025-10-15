@@ -68,7 +68,7 @@ public class TraineeProfileResource {
    * @param fromTisId The TIS ID of the trainee to move data from.
    * @param toTisId   The TIS ID of the trainee to move data to.
    */
-  @PostMapping("/move/{fromTisId}/to/{toTisId}")
+  @PostMapping("/move/{fromTisId}/{toTisId}")
   public ResponseEntity<Void> moveTssData(@PathVariable String fromTisId,
       @PathVariable String toTisId) {
     log.info("Request to move data from trainee {} to trainee {}", fromTisId, toTisId);
