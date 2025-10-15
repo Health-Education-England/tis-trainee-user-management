@@ -65,7 +65,6 @@ dependencies {
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
-  testImplementation("org.springframework.security:spring-security-test")
   testImplementation("com.playtika.testcontainers:embedded-redis:3.1.16")
   testImplementation("org.testcontainers:junit-jupiter")
 }
