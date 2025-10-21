@@ -16,7 +16,7 @@ application:
       user-account:
         update: ${USER_ACCOUNT_UPDATE_EVENT_TOPIC:}
       profile-move:
-        request: ${PROFILE_MOVE_REQUEST_TOPIC:}
+        request: ${PROFILE_MOVE_EVENT_TOPIC:}
     sqs:
       contact-details:
         updated: ${CONTACT_DETAILS_UPDATED_QUEUE:}
