@@ -108,6 +108,8 @@ public class SecurityConfig {
         // we don't need CSRF because our token is invulnerable
         .csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(auth -> auth
+            .requestMatchers(POST, "/api/trainee-profile/move/**")
+              .hasAuthority("trainee-support:move")
             .requestMatchers(GET, "/api/user-account/exists/*").authenticated()
             .requestMatchers(GET, API_PATH).hasAuthority("trainee-support:view")
             .requestMatchers(POST, API_PATH).hasAuthority("trainee-support:modify")

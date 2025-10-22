@@ -59,4 +59,22 @@ public class TraineeProfileResource {
 
     return ResponseEntity.ok().build();
   }
+
+  /**
+   * Move data from one trainee to another: CCT calculations, LTFT, FormRs, actions and
+   * notifications. The intended use is to move data from a duplicate trainee record to the
+   * authoritative trainee record.
+   *
+   * @param fromTisId The TIS ID of the trainee to move data from.
+   * @param toTisId   The TIS ID of the trainee to move data to.
+   */
+  @PostMapping("/move/{fromTisId}/{toTisId}")
+  public ResponseEntity<Void> moveTssData(@PathVariable String fromTisId,
+      @PathVariable String toTisId) {
+    log.info("Request to move data from trainee {} to trainee {}", fromTisId, toTisId);
+
+    eventPublishService.publishProfileMoveEvent(fromTisId, toTisId);
+
+    return ResponseEntity.ok().build();
+  }
 }

@@ -39,6 +39,7 @@ import uk.nhs.tis.trainee.usermanagement.service.EventPublishService;
 class TraineeProfileResourceTest {
 
   private static final String TRAINEE_ID = "traineeTisId";
+  private static final String TO_TRAINEE_ID = "to-trainee";
 
   private MockMvc mockMvc;
   private EventPublishService eventPublishService;
@@ -61,5 +62,22 @@ class TraineeProfileResourceTest {
     verify(eventPublishService).publishSingleProfileSyncEvent(traineeIdCaptor.capture());
 
     assertThat("Unexpected traineeTisId.", traineeIdCaptor.getValue(), is(TRAINEE_ID));
+  }
+
+  @Test
+  void shouldTriggerProfileMove() throws Exception {
+
+    mockMvc.perform(post("/api/trainee-profile/move/{fromTraineeId}/{toTraineeId}",
+            TRAINEE_ID, TO_TRAINEE_ID)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> fromIdCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<String> toIdCaptor = ArgumentCaptor.captor();
+    verify(eventPublishService).publishProfileMoveEvent(
+        fromIdCaptor.capture(), toIdCaptor.capture());
+
+    assertThat("Unexpected From Trainee Id.", fromIdCaptor.getValue(), is(TRAINEE_ID));
+    assertThat("Unexpected To Trainee Id.", toIdCaptor.getValue(), is(TO_TRAINEE_ID));
   }
 }

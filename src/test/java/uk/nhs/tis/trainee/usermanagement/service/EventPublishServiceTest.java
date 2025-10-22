@@ -41,11 +41,13 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.Message;
 import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
+import uk.nhs.tis.trainee.usermanagement.event.ProfileMoveEvent;
 
 class EventPublishServiceTest {
 
   private static final String REQUEST_QUEUE_URL = "request.queue.url";
   private static final String USER_ACCOUNT_UPDATE_TOPIC = "user-account.update.topic.arn";
+  private static final String PROFILE_MOVE_TOPIC = "profile-move.request.topic.arn";
   private static final String TRAINEE_ID = "11111";
   private static final String USER_ID = UUID.randomUUID().toString();
   private EventPublishService eventPublishService;
@@ -59,7 +61,8 @@ class EventPublishServiceTest {
     notificationMessagingTemplate = mock(SnsTemplate.class);
     queueMessagingTemplate = mock(SqsTemplate.class);
     eventPublishService = new EventPublishService(notificationMessagingTemplate,
-        USER_ACCOUNT_UPDATE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL, metricsService);
+        USER_ACCOUNT_UPDATE_TOPIC, PROFILE_MOVE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL,
+        metricsService);
   }
 
   @Test
@@ -108,6 +111,32 @@ class EventPublishServiceTest {
         is("Account Email Updated"));
     assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
         is(USER_ID));
+    assertThat("Unexpected producer.", headers.get("producer"), is("tis-trainee-user-management"));
+    verifyNoInteractions(metricsService);
+  }
+
+  @Test
+  void shouldPublishProfileMoveEvent() {
+    String fromTisId = "from-this";
+    String toTisId = "to-this";
+
+    eventPublishService.publishProfileMoveEvent(fromTisId, toTisId);
+
+    ArgumentCaptor<ProfileMoveEvent> eventCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.captor();
+    verify(notificationMessagingTemplate).convertAndSend(eq(PROFILE_MOVE_TOPIC),
+        eventCaptor.capture(), headersCaptor.capture());
+
+    ProfileMoveEvent event = eventCaptor.getValue();
+    assertThat("Unexpected From TIS ID.", event.fromTraineeId(), is("from-this"));
+    assertThat("Unexpected To TIS ID.", event.toTraineeId(), is("to-this"));
+
+    Map<String, Object> headers = headersCaptor.getValue();
+    assertThat("Unexpected header count.", headers.size(), is(3));
+    assertThat("Unexpected subject.", headers.get(NOTIFICATION_SUBJECT_HEADER),
+        is("Profile Data Move"));
+    assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
+        is(String.format("%s_%s", fromTisId, toTisId))) ;
     assertThat("Unexpected producer.", headers.get("producer"), is("tis-trainee-user-management"));
     verifyNoInteractions(metricsService);
   }
