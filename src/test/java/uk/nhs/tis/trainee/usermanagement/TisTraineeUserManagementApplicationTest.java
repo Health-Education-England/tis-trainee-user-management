@@ -25,17 +25,17 @@ import io.awspring.cloud.sns.core.SnsTemplate;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class TisTraineeUserManagementApplicationTest {
 
-  @MockBean
+  @MockitoBean
   private SnsTemplate snsTemplate;
 
-  @MockBean
+  @MockitoBean
   private SqsTemplate sqsTemplate;
 
   @Test
