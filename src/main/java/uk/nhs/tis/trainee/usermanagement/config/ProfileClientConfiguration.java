@@ -55,8 +55,8 @@ public class ProfileClientConfiguration {
   public JwtProfileService jwtProfileService(RestTemplateBuilder builder) {
     Duration timeoutDuration = Duration.ofSeconds(timeout);
     RestTemplate restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
-        .setReadTimeout(timeoutDuration)
-        .setConnectTimeout(timeoutDuration)
+        .readTimeout(timeoutDuration)
+        .connectTimeout(timeoutDuration)
         .build();
 
     return new JwtProfileServiceImpl(restTemplate);

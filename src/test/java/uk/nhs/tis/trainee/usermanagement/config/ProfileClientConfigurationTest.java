@@ -63,13 +63,13 @@ class ProfileClientConfigurationTest {
     RestTemplateBuilder builder = mock(RestTemplateBuilder.class);
     when(builder.requestFactory((Class<? extends ClientHttpRequestFactory>) any()))
         .thenAnswer(InvocationOnMock::getMock);
-    when(builder.setReadTimeout(any())).thenAnswer(InvocationOnMock::getMock);
-    when(builder.setConnectTimeout(any())).thenAnswer(InvocationOnMock::getMock);
+    when(builder.readTimeout(any())).thenAnswer(InvocationOnMock::getMock);
+    when(builder.connectTimeout(any())).thenAnswer(InvocationOnMock::getMock);
 
     configuration.jwtProfileService(builder);
 
     verify(builder).requestFactory(HttpComponentsClientHttpRequestFactory.class);
-    verify(builder).setReadTimeout(Duration.ofSeconds(TIMEOUT));
-    verify(builder).setConnectTimeout(Duration.ofSeconds(TIMEOUT));
+    verify(builder).readTimeout(Duration.ofSeconds(TIMEOUT));
+    verify(builder).connectTimeout(Duration.ofSeconds(TIMEOUT));
   }
 }
