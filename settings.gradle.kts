@@ -15,7 +15,7 @@ dependencyResolutionManagement {
 
   versionCatalogs {
     create("libs") {
-      from("uk.nhs.tis.trainee:version-catalog:0.0.8")
+      from("uk.nhs.tis.trainee:version-catalog:0.0.10")
     }
   }
 }
