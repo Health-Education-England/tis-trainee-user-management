@@ -136,7 +136,7 @@ class EventPublishServiceTest {
     assertThat("Unexpected subject.", headers.get(NOTIFICATION_SUBJECT_HEADER),
         is("Profile Data Move"));
     assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
-        is(String.format("%s_%s", fromTisId, toTisId))) ;
+        is(String.format("%s_%s", fromTisId, toTisId)));
     assertThat("Unexpected producer.", headers.get("producer"), is("tis-trainee-user-management"));
     verifyNoInteractions(metricsService);
   }

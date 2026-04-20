@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright 2022 Crown Copyright (Health Education England)
+ * Copyright 2026 Crown Copyright (Health Education England)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -19,36 +19,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.config;
 
-import io.awspring.cloud.sns.core.SnsTemplate;
-import io.awspring.cloud.sqs.operations.SqsTemplate;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.MongoDBContainer;
-import org.testcontainers.junit.jupiter.Container;
+import java.util.UUID;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mongodb.config.EnableMongoAuditing;
+import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
+import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class TisTraineeUserManagementApplicationTest {
+/**
+ * Configuration class for MongoDB settings and callbacks.
+ */
+@Configuration
+@EnableMongoAuditing
+public class MongoConfiguration {
 
-  // Could not get it working with the standard mocks, so full container it is.
-  @Container
-  @ServiceConnection
-  private static final MongoDBContainer mongoDBContainer = new MongoDBContainer(
-      DockerImageNames.MONGO);
-
-  @MockitoBean
-  private SnsTemplate snsTemplate;
-
-  @MockitoBean
-  private SqsTemplate sqsTemplate;
-
-  @Test
-  void contextLoads() {
-
+  /**
+   * Generates a random UUID for the ID field of an AccountEvent if it is not already set before
+   * saving to MongoDB.
+   *
+   * @return a BeforeConvertCallback that sets the ID of an AccountEvent to a random UUID if it is
+   *     null.
+   */
+  @Bean
+  public BeforeConvertCallback<AccountEvent> accountEventBeforeConvertCallback() {
+    return (entity, collection) -> entity.id() == null ? entity.withId(UUID.randomUUID()) : entity;
   }
 }

@@ -84,6 +84,7 @@ public class UserAccountService {
   private final String userPoolId;
   private final Cache cache;
 
+  private final AuditService auditService;
   private final EventPublishService eventPublishService;
 
   private Instant lastUserCaching = null;
@@ -91,12 +92,13 @@ public class UserAccountService {
   UserAccountService(CognitoService cognitoService,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
       CacheManager cacheManager, EventPublishService eventPublishService,
-      MetricsService metricsService) {
+      MetricsService metricsService, AuditService auditService) {
     this.cognitoService = cognitoService;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
     this.eventPublishService = eventPublishService;
     this.metricsService = metricsService;
+    this.auditService = auditService;
   }
 
   /**
@@ -161,6 +163,7 @@ public class UserAccountService {
       UserAccountDetailsDto existingUser = getUserAccountDetails(userId);
       String traineeId = existingUser.getTraineeId();
       String existingEmail = existingUser.getEmail();
+      auditService.accountEmailUpdated(userId, traineeId, existingEmail, newEmail);
       eventPublishService.publishEmailUpdateEvent(userId, traineeId, existingEmail, newEmail);
       log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
     }
