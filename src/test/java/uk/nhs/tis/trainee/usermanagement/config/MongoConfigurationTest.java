@@ -45,7 +45,7 @@ class MongoConfigurationTest {
 
     event = configuration.accountEventBeforeConvertCallback().onBeforeConvert(event, "");
 
-    assertThat("Unexpected form ID.", event.id(), notNullValue());
+    assertThat("Unexpected event ID.", event.id(), notNullValue());
   }
 
   @Test
@@ -55,6 +55,6 @@ class MongoConfigurationTest {
 
     event = configuration.accountEventBeforeConvertCallback().onBeforeConvert(event, "");
 
-    assertThat("Unexpected form ID.", event.id(), is(uuid));
+    assertThat("Unexpected event ID.", event.id(), is(uuid));
   }
 }
