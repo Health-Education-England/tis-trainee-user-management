@@ -106,6 +106,7 @@ class UserAccountServiceTest {
   private UserAccountService service;
   private CognitoService cognitoService;
   private Cache cache;
+  private AuditService auditService;
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
 
@@ -117,11 +118,12 @@ class UserAccountServiceTest {
     CacheManager cacheManager = mock(CacheManager.class);
     when(cacheManager.getCache("UserId")).thenReturn(cache);
 
+    auditService = mock(AuditService.class);
     eventPublishService = mock(EventPublishService.class);
     metricsService = mock(MetricsService.class);
 
     service = spy(new UserAccountService(cognitoService, USER_POOL_ID, cacheManager,
-        eventPublishService, metricsService));
+        eventPublishService, metricsService, auditService));
   }
 
   @Test
@@ -251,6 +253,33 @@ class UserAccountServiceTest {
 
     verify(eventPublishService).publishEmailUpdateEvent(USER_ID_1, TRAINEE_ID_1, previousEmail,
         newEmail);
+  }
+
+  @Test
+  void shouldSaveEventAfterUpdatingEmail() {
+    String previousEmail = "previous.email@example.com";
+    String newEmail = "new.email@example.com";
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(previousEmail)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+
+    ArgumentCaptor<String> usernameCaptor = ArgumentCaptor.captor();
+    when(cognitoService.getUserDetails(usernameCaptor.capture()))
+        .thenThrow(UserNotFoundException.class)
+        .thenReturn(userDetails);
+
+    service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1);
+
+    List<String> usernames = usernameCaptor.getAllValues();
+    assertThat("Unexpected get user details request count.", usernames.size(), is(2));
+
+    String username = usernames.get(1);
+    assertThat("Unexpected username.", username, is(USER_ID_1));
+
+    verify(auditService).accountEmailUpdated(USER_ID_1, TRAINEE_ID_1, previousEmail, newEmail);
   }
 
   @ParameterizedTest

@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.redis.testcontainers.RedisContainer;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.util.List;
 import java.util.Set;
@@ -39,21 +40,27 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
+import uk.nhs.tis.trainee.usermanagement.DockerImageNames;
 
-@SpringBootTest(properties = {"embedded.containers.enabled=true", "embedded.redis.enabled=true"})
-@ActiveProfiles({"redis", "test"})
-@Testcontainers(disabledWithoutDocker = true)
+@SpringBootTest
+@ActiveProfiles("test")
+@Testcontainers
 @ExtendWith(MockitoExtension.class)
 @DirtiesContext(classMode = ClassMode.AFTER_EACH_TEST_METHOD)
 class UserAccountServiceIntegrationTest {
@@ -63,6 +70,20 @@ class UserAccountServiceIntegrationTest {
 
   private static final String ATTRIBUTE_TRAINEE_ID = "custom:tisId";
   private static final String ATTRIBUTE_USER_ID = "sub";
+
+  @Container
+  @ServiceConnection
+  private static final MongoDBContainer mongoContainer = new MongoDBContainer(
+      DockerImageNames.MONGO);
+
+  @Container
+  private static final RedisContainer redisContainer = new RedisContainer(DockerImageNames.REDIS);
+
+  @DynamicPropertySource
+  private static void registerRedisProperties(DynamicPropertyRegistry registry) {
+    registry.add("spring.data.redis.host", redisContainer::getHost);
+    registry.add("spring.data.redis.port", () -> redisContainer.getMappedPort(6379));
+  }
 
   @MockitoBean
   private CognitoIdentityProviderClient cognitoClient;

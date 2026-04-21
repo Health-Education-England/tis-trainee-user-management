@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright 2022 Crown Copyright (Health Education England)
+ * Copyright 2026 Crown Copyright (Health Education England)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -19,36 +19,42 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement;
+package uk.nhs.tis.trainee.usermanagement.config;
 
-import io.awspring.cloud.sns.core.SnsTemplate;
-import io.awspring.cloud.sqs.operations.SqsTemplate;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.MongoDBContainer;
-import org.testcontainers.junit.jupiter.Container;
+import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class TisTraineeUserManagementApplicationTest {
+class MongoConfigurationTest {
 
-  // Could not get it working with the standard mocks, so full container it is.
-  @Container
-  @ServiceConnection
-  private static final MongoDBContainer mongoDBContainer = new MongoDBContainer(
-      DockerImageNames.MONGO);
+  private MongoConfiguration configuration;
 
-  @MockitoBean
-  private SnsTemplate snsTemplate;
-
-  @MockitoBean
-  private SqsTemplate sqsTemplate;
+  @BeforeEach
+  void setUp() {
+    configuration = new MongoConfiguration();
+  }
 
   @Test
-  void contextLoads() {
+  void shouldPopulateIdBeforeConvertWhenIdNull() {
+    AccountEvent event = AccountEvent.builder().build();
 
+    event = configuration.accountEventBeforeConvertCallback().onBeforeConvert(event, "");
+
+    assertThat("Unexpected event ID.", event.id(), notNullValue());
+  }
+
+  @Test
+  void shouldNotModifyIdBeforeConvertWhenIdPopulated() {
+    UUID uuid = UUID.randomUUID();
+    AccountEvent event = AccountEvent.builder().id(uuid).build();
+
+    event = configuration.accountEventBeforeConvertCallback().onBeforeConvert(event, "");
+
+    assertThat("Unexpected event ID.", event.id(), is(uuid));
   }
 }

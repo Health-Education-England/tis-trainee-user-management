@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "2.5.1"
+version = "2.6.0"
 
 configurations {
   compileOnly {
@@ -28,6 +28,7 @@ dependencyManagement {
 dependencies {
   // Spring Boot starters
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-security")
@@ -64,9 +65,11 @@ dependencies {
   implementation("io.micrometer:micrometer-registry-cloudwatch2")
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
-  testImplementation("org.springframework.cloud:spring-cloud-starter-bootstrap")
-  testImplementation("com.playtika.testcontainers:embedded-redis:3.1.16")
+  testImplementation("org.springframework.boot:spring-boot-testcontainers")
   testImplementation("org.testcontainers:junit-jupiter")
+  testImplementation("org.testcontainers:localstack")
+  testImplementation("org.testcontainers:mongodb")
+  testImplementation("com.redis:testcontainers-redis")
 }
 
 java {
