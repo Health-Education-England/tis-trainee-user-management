@@ -35,7 +35,7 @@ spring:
         namespace: TIS/Trainee/UserManagement
   data:
     mongodb:
-      uri: mongodb://${DB_USER:admin}:${DB_PASSWORD:pwd}@${DB_HOST:localhost}:${DB_PORT:27017}/${DB_NAME:usermanagement}?authSource=${AUTH_SOURCE:admin}&retryWrites=false
+      uri: mongodb://${DB_USER:admin}:${DB_PASSWORD:pwd}@${DB_HOST:localhost}:${DB_PORT:27017}/${DB_NAME:user_management}?authSource=${AUTH_SOURCE:admin}&retryWrites=false
       auto-index-creation: true
       uuid-representation: standard
     redis:

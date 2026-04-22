@@ -41,7 +41,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
  *                  an email update event.
  * @param created   The time the event occurred.
  */
-@Document
+@Document("AccountEvent")
 @Builder
 public record AccountEvent(
     @Id
