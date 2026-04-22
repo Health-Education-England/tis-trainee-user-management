@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupRequest;
@@ -253,6 +255,29 @@ class UserAccountServiceTest {
 
     verify(eventPublishService).publishEmailUpdateEvent(USER_ID_1, TRAINEE_ID_1, previousEmail,
         newEmail);
+  }
+
+  @Test
+  void shouldGetExistingDetailsBeforeUpdatingEmail() {
+    String previousEmail = "previous.email@example.com";
+    String newEmail = "new.email@example.com";
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(previousEmail)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+
+    when(cognitoService.getUserDetails(any()))
+        .thenThrow(UserNotFoundException.class)
+        .thenReturn(userDetails);
+
+    service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1);
+
+    InOrder inOrder = inOrder(cognitoService);
+    inOrder.verify(cognitoService).getUserDetails("new.email@example.com");
+    inOrder.verify(cognitoService).getUserDetails(USER_ID_1);
+    inOrder.verify(cognitoService).updateAttributes(eq(USER_ID_1), any());
   }
 
   @Test
