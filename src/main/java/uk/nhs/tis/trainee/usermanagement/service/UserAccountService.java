@@ -154,15 +154,16 @@ public class UserAccountService {
         throw new IllegalArgumentException(message);
       }
     } catch (UserNotFoundException e) {
+      UserAccountDetailsDto existingUser = getUserAccountDetails(userId);
+      String traineeId = existingUser.getTraineeId();
+      String existingEmail = existingUser.getEmail();
+
       // If an existing user was not found then the new email address can be used.
       attributeTypes.add(AttributeType.builder().name(ATTRIBUTE_EMAIL).value(newEmail).build());
       attributeTypes.add(
           AttributeType.builder().name(ATTRIBUTE_EMAIL_VERIFIED).value("true").build());
       cognitoService.updateAttributes(userId, attributeTypes);
 
-      UserAccountDetailsDto existingUser = getUserAccountDetails(userId);
-      String traineeId = existingUser.getTraineeId();
-      String existingEmail = existingUser.getEmail();
       auditService.accountEmailUpdated(userId, traineeId, existingEmail, newEmail);
       eventPublishService.publishEmailUpdateEvent(userId, traineeId, existingEmail, newEmail);
       log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
