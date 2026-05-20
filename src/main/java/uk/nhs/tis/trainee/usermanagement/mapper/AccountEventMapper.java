@@ -41,15 +41,31 @@ public interface AccountEventMapper {
    * @param event The account event to convert.
    * @return The converted DTO.
    */
-  @Mapping(target = "previousEmail",
-      expression = "java(toEmailUpdatedDetail(event) != null " +
-          "? toEmailUpdatedDetail(event).before() " +
-          ": null)")
-  @Mapping(target = "newEmail",
-      expression = "java(toEmailUpdatedDetail(event) != null " +
-          "? toEmailUpdatedDetail(event).after() " +
-          ": null)")
+  @Mapping(target = "previousEmail", expression = "java(getPreviousEmail(event))")
+  @Mapping(target = "newEmail", expression = "java(getNewEmail(event))")
   EmailUpdateEventDto toEmailUpdateEventDto(AccountEvent event);
+
+  /**
+   * Get the previous email from an email updated event.
+   *
+   * @param event The account event.
+   * @return The previous email, or null if the detail is not applicable.
+   */
+  default String getPreviousEmail(AccountEvent event) {
+    EmailUpdatedDetail detail = toEmailUpdatedDetail(event);
+    return detail != null ? detail.before() : null;
+  }
+
+  /**
+   * Get the new email from an email updated event.
+   *
+   * @param event The account event.
+   * @return The new email, or null if the detail is not applicable.
+   */
+  default String getNewEmail(AccountEvent event) {
+    EmailUpdatedDetail detail = toEmailUpdatedDetail(event);
+    return detail != null ? detail.after() : null;
+  }
 
   /**
    * Cast the event detail to {@link EmailUpdatedDetail}, returning null if not applicable.
