@@ -55,9 +55,13 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.TooManyRequ
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserStatusType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
+import uk.nhs.tis.trainee.usermanagement.dto.EmailUpdateEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
+import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 
 /**
  * A service for accessing user account data.
@@ -86,19 +90,24 @@ public class UserAccountService {
 
   private final AuditService auditService;
   private final EventPublishService eventPublishService;
+  private final AccountEventRepository accountEventRepository;
+  private final AccountEventMapper accountEventMapper;
 
   private Instant lastUserCaching = null;
 
   UserAccountService(CognitoService cognitoService,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
       CacheManager cacheManager, EventPublishService eventPublishService,
-      MetricsService metricsService, AuditService auditService) {
+      MetricsService metricsService, AuditService auditService,
+      AccountEventRepository accountEventRepository, AccountEventMapper accountEventMapper) {
     this.cognitoService = cognitoService;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
     this.eventPublishService = eventPublishService;
     this.metricsService = metricsService;
     this.auditService = auditService;
+    this.accountEventRepository = accountEventRepository;
+    this.accountEventMapper = accountEventMapper;
   }
 
   /**
@@ -499,5 +508,17 @@ public class UserAccountService {
           ids.add(attr.get(ATTRIBUTE_SUB));
           cache.put(tisId, ids);
         });
+  }
+
+  /**
+   * Get the latest EMAIL_UPDATED account event for the given trainee.
+   *
+   * @param traineeId The ID of the trainee.
+   * @return The latest EMAIL_UPDATED event as a DTO, if any.
+   */
+  public Optional<EmailUpdateEventDto> getLatestEmailUpdateEvent(String traineeId) {
+    return accountEventRepository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
+            traineeId, AccountEventType.EMAIL_UPDATED)
+        .map(accountEventMapper::toEmailUpdateEventDto);
   }
 }

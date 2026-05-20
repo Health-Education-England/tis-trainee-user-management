@@ -19,26 +19,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.repository;
+package uk.nhs.tis.trainee.usermanagement.dto;
 
-import java.util.Optional;
-import java.util.UUID;
-import org.springframework.data.mongodb.repository.MongoRepository;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
+import java.time.Instant;
+import lombok.Builder;
+import lombok.Value;
 
 /**
- * Repository for {@link AccountEvent} entities.
+ * Details of the latest email update event for a trainee account.
  */
-public interface AccountEventRepository extends MongoRepository<AccountEvent, UUID> {
+@Builder
+@Value
+public class EmailUpdateEventDto {
 
-  /**
-   * Find the latest event of a given type for a trainee, ordered by created timestamp descending.
-   *
-   * @param traineeId The ID of the trainee.
-   * @param type      The type of account event.
-   * @return The latest matching event, if any.
-   */
-  Optional<AccountEvent> findFirstByTraineeIdAndTypeOrderByCreatedDesc(String traineeId,
-      AccountEventType type);
+  String traineeId;
+  String previousEmail;
+  String newEmail;
+  Instant created;
 }
+
