@@ -74,6 +74,6 @@ public interface AccountEventMapper {
    * @return The detail cast to {@link EmailUpdatedDetail}, or null.
    */
   default EmailUpdatedDetail toEmailUpdatedDetail(AccountEvent event) {
-    return event != null && event.detail() instanceof EmailUpdatedDetail detail ? detail : null;
+    return event.detail() instanceof EmailUpdatedDetail detail ? detail : null;
   }
 }

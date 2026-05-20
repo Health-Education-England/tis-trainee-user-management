@@ -149,19 +149,18 @@ class AccountEventRepositoryIntegrationTest {
   }
 
   @Test
-  void shouldReturnLatestEmailUpdateEventForTrainee() throws InterruptedException {
+  void shouldReturnLatestEmailUpdateEventForTrainee() {
     AccountEvent olderEvent = AccountEvent.builder()
         .traineeId("trainee-1")
         .type(AccountEventType.EMAIL_UPDATED)
+        .created(Instant.now().minus(1, ChronoUnit.HOURS))
         .build();
     template.insert(olderEvent);
-
-    // Ensure distinct created timestamps.
-    Thread.sleep(10);
 
     AccountEvent newerEvent = AccountEvent.builder()
         .traineeId("trainee-1")
         .type(AccountEventType.EMAIL_UPDATED)
+        .created(Instant.now())
         .build();
     newerEvent = template.insert(newerEvent);
 
