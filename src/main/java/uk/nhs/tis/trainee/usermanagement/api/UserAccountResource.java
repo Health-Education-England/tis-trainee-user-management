@@ -24,6 +24,7 @@ package uk.nhs.tis.trainee.usermanagement.api;
 import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import uk.nhs.tis.trainee.usermanagement.dto.EmailUpdateEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
@@ -113,5 +115,20 @@ public class UserAccountResource {
     log.info("Delete Cognito account requested for user '{}'.", username);
     service.deleteCognitoAccount(username);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Get the latest EMAIL_UPDATED account event for the given trainee.
+   *
+   * @param traineeId The ID of the trainee.
+   * @return The latest EMAIL_UPDATED event, or 404 if none found.
+   */
+  @GetMapping("/email-update/latest/{traineeId}")
+  ResponseEntity<EmailUpdateEventDto> getLatestEmailUpdateEvent(@PathVariable String traineeId) {
+    log.info("Request for latest EMAIL_UPDATED event for trainee '{}'", traineeId);
+
+    Optional<EmailUpdateEventDto> event = service.getLatestEmailUpdateEvent(traineeId);
+
+    return ResponseEntity.of(event);
   }
 }

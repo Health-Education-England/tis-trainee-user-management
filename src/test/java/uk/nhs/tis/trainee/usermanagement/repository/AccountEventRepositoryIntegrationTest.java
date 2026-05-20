@@ -34,10 +34,10 @@ import com.mongodb.client.FindIterable;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
@@ -55,6 +55,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import uk.nhs.tis.trainee.usermanagement.DockerImageNames;
 import uk.nhs.tis.trainee.usermanagement.config.MongoConfiguration;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
+import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 
 @DataMongoTest
 @Import(MongoConfiguration.class)
@@ -75,7 +76,9 @@ class AccountEventRepositoryIntegrationTest {
   @Autowired
   private MongoTemplate template;
 
-  @ParameterizedTest
+  @Autowired
+  private AccountEventRepository repository;
+
   @CsvSource(delimiter = '|', textBlock = """
       _id_      | _id
       userId    | userId
@@ -135,5 +138,52 @@ class AccountEventRepositoryIntegrationTest {
     Instant roughlyCreated = savedRecord.created().truncatedTo(ChronoUnit.SECONDS);
     assertThat("Unexpected saved record created timestamp.", roughlyCreated.equals(roughlyNow),
         is(true));
+  }
+
+  @Test
+  void shouldReturnEmptyWhenNoEmailUpdateEventForTrainee() {
+    Optional<AccountEvent> result = repository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
+        "unknown-trainee", AccountEventType.EMAIL_UPDATED);
+
+    assertThat("Unexpected result.", result.isPresent(), is(false));
+  }
+
+  @Test
+  void shouldReturnLatestEmailUpdateEventForTrainee() throws InterruptedException {
+    AccountEvent olderEvent = AccountEvent.builder()
+        .traineeId("trainee-1")
+        .type(AccountEventType.EMAIL_UPDATED)
+        .build();
+    template.insert(olderEvent);
+
+    // Ensure distinct created timestamps.
+    Thread.sleep(10);
+
+    AccountEvent newerEvent = AccountEvent.builder()
+        .traineeId("trainee-1")
+        .type(AccountEventType.EMAIL_UPDATED)
+        .build();
+    newerEvent = template.insert(newerEvent);
+
+    Optional<AccountEvent> result = repository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
+        "trainee-1", AccountEventType.EMAIL_UPDATED);
+
+    assertThat("Unexpected result.", result.isPresent(), is(true));
+    AccountEvent found = result.get();
+    assertThat("Unexpected event id.", found.id(), is(newerEvent.id()));
+  }
+
+  @Test
+  void shouldNotReturnEmailUpdateEventForDifferentTrainee() {
+    AccountEvent event = AccountEvent.builder()
+        .traineeId("trainee-2")
+        .type(AccountEventType.EMAIL_UPDATED)
+        .build();
+    template.insert(event);
+
+    Optional<AccountEvent> result = repository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
+        "trainee-1", AccountEventType.EMAIL_UPDATED);
+
+    assertThat("Unexpected result.", result.isPresent(), is(false));
   }
 }

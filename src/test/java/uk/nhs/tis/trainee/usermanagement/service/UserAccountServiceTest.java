@@ -77,9 +77,14 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRe
 import software.amazon.awssdk.services.cognitoidentityprovider.model.TooManyRequestsException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
+import uk.nhs.tis.trainee.usermanagement.dto.EmailUpdateEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
+import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
+import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 
 class UserAccountServiceTest {
 
@@ -111,6 +116,8 @@ class UserAccountServiceTest {
   private AuditService auditService;
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
+  private AccountEventRepository accountEventRepository;
+  private AccountEventMapper accountEventMapper;
 
   @BeforeEach
   void setUp() {
@@ -123,9 +130,12 @@ class UserAccountServiceTest {
     auditService = mock(AuditService.class);
     eventPublishService = mock(EventPublishService.class);
     metricsService = mock(MetricsService.class);
+    accountEventRepository = mock(AccountEventRepository.class);
+    accountEventMapper = mock(AccountEventMapper.class);
 
     service = spy(new UserAccountService(cognitoService, USER_POOL_ID, cacheManager,
-        eventPublishService, metricsService, auditService));
+        eventPublishService, metricsService, auditService, accountEventRepository,
+        accountEventMapper));
   }
 
   @Test
@@ -927,5 +937,40 @@ class UserAccountServiceTest {
     service.getUserAccountIds(TRAINEE_ID_2);
 
     verify(cognitoService, times(1)).listUsers(any());
+  }
+
+  @Test
+  void shouldReturnEmptyWhenNoLatestEmailUpdateEventFound() {
+    when(accountEventRepository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
+        TRAINEE_ID_1, AccountEventType.EMAIL_UPDATED))
+        .thenReturn(Optional.empty());
+
+    Optional<EmailUpdateEventDto> result = service.getLatestEmailUpdateEvent(TRAINEE_ID_1);
+
+    assertThat("Unexpected result.", result.isPresent(), is(false));
+  }
+
+  @Test
+  void shouldReturnMappedDtoWhenLatestEmailUpdateEventFound() {
+    AccountEvent event = AccountEvent.builder()
+        .traineeId(TRAINEE_ID_1)
+        .type(AccountEventType.EMAIL_UPDATED)
+        .build();
+    EmailUpdateEventDto dto = EmailUpdateEventDto.builder()
+        .traineeId(TRAINEE_ID_1)
+        .previousEmail("old@example.com")
+        .newEmail("new@example.com")
+        .build();
+
+    when(accountEventRepository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
+        TRAINEE_ID_1, AccountEventType.EMAIL_UPDATED))
+        .thenReturn(Optional.of(event));
+    when(accountEventMapper.toEmailUpdateEventDto(event)).thenReturn(dto);
+
+    Optional<EmailUpdateEventDto> result = service.getLatestEmailUpdateEvent(TRAINEE_ID_1);
+
+    assertThat("Unexpected result.", result.isPresent(), is(true));
+    assertThat("Unexpected dto.", result.get(), is(dto));
+    verify(accountEventMapper).toEmailUpdateEventDto(event);
   }
 }

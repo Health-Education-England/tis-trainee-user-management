@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,7 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import uk.nhs.tis.trainee.usermanagement.dto.EmailUpdateEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
@@ -54,6 +56,7 @@ class UserAccountResourceTest {
 
   private static final String ID = UUID.randomUUID().toString();
   private static final String EMAIL = "user@example.com";
+  private static final String TRAINEE_ID = "trainee-123";
 
   @Autowired
   private MappingJackson2HttpMessageConverter jacksonMessageConverter;
@@ -181,5 +184,35 @@ class UserAccountResourceTest {
         .andExpect(status().isNoContent());
 
     verify(service).deleteCognitoAccount(EMAIL);
+  }
+
+  @Test
+  void shouldReturnNotFoundWhenNoEmailUpdateEventExists() throws Exception {
+    when(service.getLatestEmailUpdateEvent(TRAINEE_ID)).thenReturn(Optional.empty());
+
+    mockMvc.perform(get("/api/user-account/email-update/latest/{traineeId}", TRAINEE_ID)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void shouldReturnLatestEmailUpdateEventWhenExists() throws Exception {
+    Instant created = Instant.parse("2026-01-15T10:00:00Z");
+    EmailUpdateEventDto dto = EmailUpdateEventDto.builder()
+        .traineeId(TRAINEE_ID)
+        .previousEmail("old@example.com")
+        .newEmail("new@example.com")
+        .created(created)
+        .build();
+
+    when(service.getLatestEmailUpdateEvent(TRAINEE_ID)).thenReturn(Optional.of(dto));
+
+    mockMvc.perform(get("/api/user-account/email-update/latest/{traineeId}", TRAINEE_ID)
+            .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.traineeId").value(TRAINEE_ID))
+        .andExpect(jsonPath("$.previousEmail").value("old@example.com"))
+        .andExpect(jsonPath("$.newEmail").value("new@example.com"))
+        .andExpect(jsonPath("$.created").value(created.toString()));
   }
 }
