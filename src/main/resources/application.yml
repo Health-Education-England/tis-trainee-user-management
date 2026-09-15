@@ -18,6 +18,7 @@ application:
       profile-move:
         request: ${PROFILE_MOVE_EVENT_TOPIC:}
     sqs:
+      cognito-events: ${COGNITO_EVENTS_QUEUE:}
       contact-details:
         updated: ${CONTACT_DETAILS_UPDATED_QUEUE:}
       request: ${REQUEST_QUEUE_URL:}

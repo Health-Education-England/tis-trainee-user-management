@@ -58,7 +58,7 @@ public record AccountEvent(
     AccountEventDetail detail,
 
     @CreatedDate
-    Instant created) {
+    Instant created) implements UuidIdentifiedEntity {
 
   /**
    * Marker interface for additional details about an account event.

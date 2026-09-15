@@ -91,12 +91,36 @@ public class CognitoService {
    * <p><b>Warning</b>: this will contribute to monthly active user (MAU) count for the purposes of
    * billing if the fallback is used.
    *
-   * @return The user account details, or empty if not found.
+   * @param username The username of the user to retrieve.
+   * @return The user account details.
+   * @throws UserNotFoundException If the user was not found.
    */
   public UserAccountDetailsDto getUserDetails(String username) throws UserNotFoundException {
+    return getUserDetails(username, true, true);
+  }
+
+  /**
+   * A wrapper around {@link CognitoIdentityProviderClient#adminGetUser(AdminGetUserRequest)} which
+   * attempts to avoid increasing Monthly Active User (MAU) count with alternative endpoints. If all
+   * data is not available via alternative endpoints, then {@code adminGetUser()} will still be used
+   * as a fallback.
+   *
+   * <p><b>Warning</b>: this will contribute to monthly active user (MAU) count for the purposes of
+   * billing if the fallback is used.
+   *
+   * @param username       The username of the user to retrieve.
+   * @param requireGroups  Whether groups are required. If true an additional request will be made
+   *                       to retrieve them.
+   * @param requireMfaType Whether MFA Type is required. If true, the fallback will be used if the
+   *                       attribute is not present.
+   * @return The user account details.
+   * @throws UserNotFoundException If the user was not found.
+   */
+  public UserAccountDetailsDto getUserDetails(String username, boolean requireGroups,
+      boolean requireMfaType) throws UserNotFoundException {
     log.info("Getting user details for username {}.", username);
     UserType user = getUser(username);
-    List<String> groups = getUserGroups(username);
+    List<String> groups = requireGroups ? getUserGroups(username) : List.of();
 
     // Exclude NO_MFA for now, there is no guarantee that the attribute is set when MFA is set up.
     boolean mfaTypeAvailable = user.attributes().stream()
@@ -105,7 +129,7 @@ public class CognitoService {
         .map(MfaType::valueOf)
         .anyMatch(mfa -> mfa != MfaType.NO_MFA);
 
-    if (mfaTypeAvailable) {
+    if (!requireMfaType || mfaTypeAvailable) {
       return mapper.toDto(user, groups);
     } else {
       log.info("MFA details not available via attributes, calling AdminGetUser endpoint.");

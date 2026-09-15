@@ -19,31 +19,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.config;
+package uk.nhs.tis.trainee.usermanagement.event;
 
-import java.util.UUID;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.mongodb.config.EnableMongoAuditing;
-import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
-import uk.nhs.tis.trainee.usermanagement.model.UuidIdentifiedEntity;
+import io.awspring.cloud.sqs.annotation.SqsListener;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import uk.nhs.tis.trainee.usermanagement.dto.CognitoEventDto;
+import uk.nhs.tis.trainee.usermanagement.dto.EventBridgeEventDto;
+import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
 /**
- * Configuration class for MongoDB settings and callbacks.
+ * A listener for Cognito events received from EventBridge.
  */
-@Configuration
-@EnableMongoAuditing
-public class MongoConfiguration {
+@Slf4j
+@Component
+public class CognitoEventListener {
+
+  private final UserAccountService userAccountService;
 
   /**
-   * Generates a random UUID for the ID field of a UuidIdentifiedEntity if it is not already set
-   * before saving to MongoDB.
+   * Constructor for the CognitoEventListener.
    *
-   * @return a BeforeConvertCallback that sets the ID of a UuidIdentifiedEntity to a random UUID if
-   *      it is null.
+   * @param userAccountService The service to handle user account operations.
    */
-  @Bean
-  public BeforeConvertCallback<UuidIdentifiedEntity> accountEventBeforeConvertCallback() {
-    return (entity, collection) -> entity.id() == null ? entity.withId(UUID.randomUUID()) : entity;
+  public CognitoEventListener(UserAccountService userAccountService) {
+    this.userAccountService = userAccountService;
+  }
+
+  /**
+   * Handle Cognito events received from EventBridge.
+   *
+   * @param event The Cognito event received from EventBridge.
+   */
+  @SqsListener("${application.aws.sqs.cognito-events}")
+  void handleCognitoEvent(EventBridgeEventDto<CognitoEventDto> event) {
+    log.info("Received Cognito event: {}", event);
+    userAccountService.updateAccountDetails(event.detail());
   }
 }

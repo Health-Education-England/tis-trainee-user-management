@@ -43,6 +43,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -111,377 +112,414 @@ class CognitoServiceTest {
         groupResponse);
   }
 
-  @Test
-  void shouldThrowExceptionGettingUserDetailsWhenUserNotFound() {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(
-        ListUsersResponse.builder().users(List.of()).build()
-    );
+  @Nested
+  class GetUserDetails {
 
-    assertThrows(UserNotFoundException.class, () -> service.getUserDetails(USER_ID));
+    @Test
+    void shouldThrowExceptionWhenUserNotFound() {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(
+          ListUsersResponse.builder().users(List.of()).build()
+      );
 
-    verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
-  }
+      assertThrows(UserNotFoundException.class, () -> service.getUserDetails(USER_ID));
 
-  @ParameterizedTest
-  @CsvSource(delimiter = '|', textBlock = """
-      sub | 369536f5-13ff-4b97-936f-85f112880ebf
-      email | email@example.com
-      """)
-  void shouldGetUserDetailsFromListUsersByUsername(String type, String username) {
-    ArgumentCaptor<ListUsersRequest> requestCaptor = ArgumentCaptor.captor();
-    when(cognitoClient.listUsers(requestCaptor.capture())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
-            )
-            .build())
-        .build()
-    );
+      verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
+    }
 
-    service.getUserDetails(username);
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        sub | 369536f5-13ff-4b97-936f-85f112880ebf
+        email | email@example.com
+        """)
+    void shouldGetFromListUsersByUsername(String type, String username) {
+      ArgumentCaptor<ListUsersRequest> requestCaptor = ArgumentCaptor.captor();
+      when(cognitoClient.listUsers(requestCaptor.capture())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
+              )
+              .build())
+          .build()
+      );
 
-    ListUsersRequest request = requestCaptor.getValue();
-    assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.filter(),
-        is(String.format("%s=\"%s\"", type, username)));
+      service.getUserDetails(username);
 
-    verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
-  }
+      ListUsersRequest request = requestCaptor.getValue();
+      assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
+      assertThat("Unexpected username.", request.filter(),
+          is(String.format("%s=\"%s\"", type, username)));
 
-  @ParameterizedTest
-  @EnumSource(value = MfaType.class, mode = EXCLUDE, names = "NO_MFA")
-  void shouldGetUserDetailsFromListUsersWhenCustomMfaSet(MfaType mfaType) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
-                AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString()).build(),
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
-            )
-            .userCreateDate(CREATED)
-            .userStatus(CONFIRMED.toString())
-            .build())
-        .build()
-    );
+      verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
+    }
 
-    UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID);
+    @ParameterizedTest
+    @EnumSource(value = MfaType.class, mode = EXCLUDE, names = "NO_MFA")
+    void shouldGetFromListUsersWhenCustomMfaSet(MfaType mfaType) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
+                  AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString())
+                      .build(),
+                  AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
+              )
+              .userCreateDate(CREATED)
+              .userStatus(CONFIRMED.toString())
+              .build())
+          .build()
+      );
 
-    assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
-    assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
-    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(), is(mfaType.toString()));
-    assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
-    assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
-    assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(), is(CREATED));
-    assertThat("Unexpected trainee ID.", userDetails.getTraineeId(), is(TRAINEE_ID));
+      UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID);
 
-    verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
-  }
+      assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
+      assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
+      assertThat("Unexpected MFA status.", userDetails.getMfaStatus(), is(mfaType.toString()));
+      assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
+      assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
+      assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(), is(CREATED));
+      assertThat("Unexpected trainee ID.", userDetails.getTraineeId(), is(TRAINEE_ID));
 
-  @ParameterizedTest
-  @EnumSource(value = MfaType.class, mode = EXCLUDE, names = "NO_MFA")
-  void shouldNotPopulateCustomMfaTypeFromListUsersWhenCustomMfaSet(MfaType mfaType) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
-                AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString()).build(),
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
-            )
-            .userCreateDate(CREATED)
-            .userStatus(CONFIRMED.toString())
-            .build())
-        .build()
-    );
+      verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
+    }
 
-    service.getUserDetails(USER_ID);
+    @ParameterizedTest
+    @EnumSource(value = MfaType.class, mode = EXCLUDE, names = "NO_MFA")
+    void shouldNotPopulateCustomMfaTypeFromListUsersWhenCustomMfaSet(MfaType mfaType) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
+                  AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString())
+                      .build(),
+                  AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
+              )
+              .userCreateDate(CREATED)
+              .userStatus(CONFIRMED.toString())
+              .build())
+          .build()
+      );
 
-    verify(cognitoClient, never()).adminUpdateUserAttributes(
-        (AdminUpdateUserAttributesRequest) any());
-  }
+      service.getUserDetails(USER_ID);
 
-  @ParameterizedTest
-  @ValueSource(strings = {"369536f5-13ff-4b97-936f-85f112880ebf", "email@example.com"})
-  void shouldGetUserDetailsFromAdminGetUserByUsername(String username) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder().attributes(List.of()).build())
-        .build());
+      verify(cognitoClient, never()).adminUpdateUserAttributes(
+          (AdminUpdateUserAttributesRequest) any());
+    }
 
-    ArgumentCaptor<AdminGetUserRequest> requestCaptor = ArgumentCaptor.captor();
-    when(cognitoClient.adminGetUser(requestCaptor.capture())).thenReturn(
-        AdminGetUserResponse.builder().build());
+    @ParameterizedTest
+    @ValueSource(strings = {"369536f5-13ff-4b97-936f-85f112880ebf", "email@example.com"})
+    void shouldGetFromAdminGetUserByUsername(String username) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder().attributes(List.of()).build())
+          .build());
 
-    service.getUserDetails(username);
+      ArgumentCaptor<AdminGetUserRequest> requestCaptor = ArgumentCaptor.captor();
+      when(cognitoClient.adminGetUser(requestCaptor.capture())).thenReturn(
+          AdminGetUserResponse.builder().build());
 
-    AdminGetUserRequest request = requestCaptor.getValue();
-    assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.username(), is(username));
-  }
+      service.getUserDetails(username);
 
-  @Test
-  void shouldGetUserDetailsFromAdminGetUserWhenCustomMfaNotSet() {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder().attributes(List.of()).build())
-        .build());
+      AdminGetUserRequest request = requestCaptor.getValue();
+      assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
+      assertThat("Unexpected username.", request.username(), is(username));
+    }
 
-    when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
-        AdminGetUserResponse.builder()
-            .userAttributes(
-                AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
-                AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
-            )
-            .preferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
-            .userCreateDate(CREATED)
-            .userStatus(CONFIRMED)
-            .build()
-    );
+    @Test
+    void shouldGetFromAdminGetUserWhenCustomMfaNotSet() {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder().attributes(List.of()).build())
+          .build());
 
-    UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID);
+      when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
+          AdminGetUserResponse.builder()
+              .userAttributes(
+                  AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
+                  AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
+              )
+              .preferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
+              .userCreateDate(CREATED)
+              .userStatus(CONFIRMED)
+              .build()
+      );
 
-    assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
-    assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
-    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
-        is(SOFTWARE_TOKEN_MFA.toString()));
-    assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
-    assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
-    assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(), is(CREATED));
-    assertThat("Unexpected trainee ID.", userDetails.getTraineeId(), is(TRAINEE_ID));
-  }
+      UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID);
 
-  @ParameterizedTest
-  @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      EMAIL_OTP          | EMAIL_OTP
-      SMS_MFA            | SMS_MFA
-      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
-      null               | NO_MFA
-      """)
-  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNotSet(
-      String preferredMfa, MfaType mfaType) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder().attributes(List.of()).build())
-        .build());
+      assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
+      assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
+      assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
+          is(SOFTWARE_TOKEN_MFA.toString()));
+      assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
+      assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
+      assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(), is(CREATED));
+      assertThat("Unexpected trainee ID.", userDetails.getTraineeId(), is(TRAINEE_ID));
+    }
 
-    when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
-        AdminGetUserResponse.builder().preferredMfaSetting(preferredMfa).build()
-    );
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+        EMAIL_OTP          | EMAIL_OTP
+        SMS_MFA            | SMS_MFA
+        SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
+        null               | NO_MFA
+        """)
+    void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNotSet(
+        String preferredMfa, MfaType mfaType) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder().attributes(List.of()).build())
+          .build());
 
-    service.getUserDetails(USER_ID);
+      when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
+          AdminGetUserResponse.builder().preferredMfaSetting(preferredMfa).build()
+      );
 
-    ArgumentCaptor<AdminUpdateUserAttributesRequest> requestCaptor = ArgumentCaptor.captor();
-    verify(cognitoClient).adminUpdateUserAttributes(requestCaptor.capture());
+      service.getUserDetails(USER_ID);
 
-    AdminUpdateUserAttributesRequest request = requestCaptor.getValue();
-    assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.username(), is(USER_ID));
+      ArgumentCaptor<AdminUpdateUserAttributesRequest> requestCaptor = ArgumentCaptor.captor();
+      verify(cognitoClient).adminUpdateUserAttributes(requestCaptor.capture());
 
-    List<AttributeType> requestAttributes = request.userAttributes();
-    assertThat("Unexpected attribute count.", requestAttributes, hasSize(1));
+      AdminUpdateUserAttributesRequest request = requestCaptor.getValue();
+      assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
+      assertThat("Unexpected username.", request.username(), is(USER_ID));
 
-    AttributeType requestAttribute = requestAttributes.get(0);
-    assertThat("Unexpected attribute name.", requestAttribute.name(), is(ATTRIBUTE_MFA_TYPE));
-    assertThat("Unexpected attribute value.", requestAttribute.value(), is(mfaType.toString()));
-  }
+      List<AttributeType> requestAttributes = request.userAttributes();
+      assertThat("Unexpected attribute count.", requestAttributes, hasSize(1));
 
-  @Test
-  void shouldGetUserDetailsFromAdminGetUserWhenCustomMfaNoMfa() {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(NO_MFA.toString()).build())
-            .build())
-        .build()
-    );
+      AttributeType requestAttribute = requestAttributes.get(0);
+      assertThat("Unexpected attribute name.", requestAttribute.name(), is(ATTRIBUTE_MFA_TYPE));
+      assertThat("Unexpected attribute value.", requestAttribute.value(), is(mfaType.toString()));
+    }
 
-    when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
-        AdminGetUserResponse.builder()
-            .userAttributes(
-                AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
-                AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
-            )
-            .preferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
-            .userCreateDate(CREATED)
-            .userStatus(CONFIRMED)
-            .build()
-    );
+    @Test
+    void shouldGetFromAdminGetUserWhenCustomMfaNoMfa() {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(NO_MFA.toString()).build())
+              .build())
+          .build()
+      );
 
-    UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID);
+      when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
+          AdminGetUserResponse.builder()
+              .userAttributes(
+                  AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
+                  AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
+              )
+              .preferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
+              .userCreateDate(CREATED)
+              .userStatus(CONFIRMED)
+              .build()
+      );
 
-    assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
-    assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
-    assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
-        is(SOFTWARE_TOKEN_MFA.toString()));
-    assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
-    assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
-    assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(), is(CREATED));
-    assertThat("Unexpected trainee ID.", userDetails.getTraineeId(), is(TRAINEE_ID));
-  }
+      UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID);
 
-  @ParameterizedTest
-  @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      EMAIL_OTP          | EMAIL_OTP
-      SMS_MFA            | SMS_MFA
-      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
-      null               | NO_MFA
-      """)
-  void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNoMfa(String preferredMfa,
-      MfaType mfaType) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(NO_MFA.toString()).build()
-            )
-            .build())
-        .build()
-    );
+      assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
+      assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
+      assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
+          is(SOFTWARE_TOKEN_MFA.toString()));
+      assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
+      assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
+      assertThat("Unexpected creation timestamp.", userDetails.getAccountCreated(), is(CREATED));
+      assertThat("Unexpected trainee ID.", userDetails.getTraineeId(), is(TRAINEE_ID));
+    }
 
-    when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
-        AdminGetUserResponse.builder().preferredMfaSetting(preferredMfa).build()
-    );
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+        EMAIL_OTP          | EMAIL_OTP
+        SMS_MFA            | SMS_MFA
+        SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
+        null               | NO_MFA
+        """)
+    void shouldPopulateCustomMfaTypeFromAdminGetUserWhenCustomMfaNoMfa(String preferredMfa,
+        MfaType mfaType) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(NO_MFA.toString()).build()
+              )
+              .build())
+          .build()
+      );
 
-    service.getUserDetails(USER_ID);
+      when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(
+          AdminGetUserResponse.builder().preferredMfaSetting(preferredMfa).build()
+      );
 
-    ArgumentCaptor<AdminUpdateUserAttributesRequest> requestCaptor = ArgumentCaptor.captor();
-    verify(cognitoClient).adminUpdateUserAttributes(requestCaptor.capture());
+      service.getUserDetails(USER_ID);
 
-    AdminUpdateUserAttributesRequest request = requestCaptor.getValue();
-    assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
-    assertThat("Unexpected username.", request.username(), is(USER_ID));
+      ArgumentCaptor<AdminUpdateUserAttributesRequest> requestCaptor = ArgumentCaptor.captor();
+      verify(cognitoClient).adminUpdateUserAttributes(requestCaptor.capture());
 
-    List<AttributeType> requestAttributes = request.userAttributes();
-    assertThat("Unexpected attribute count.", requestAttributes, hasSize(1));
+      AdminUpdateUserAttributesRequest request = requestCaptor.getValue();
+      assertThat("Unexpected user pool id.", request.userPoolId(), is(USER_POOL_ID));
+      assertThat("Unexpected username.", request.username(), is(USER_ID));
 
-    AttributeType requestAttribute = requestAttributes.get(0);
-    assertThat("Unexpected attribute name.", requestAttribute.name(), is(ATTRIBUTE_MFA_TYPE));
-    assertThat("Unexpected attribute value.", requestAttribute.value(), is(mfaType.toString()));
-  }
+      List<AttributeType> requestAttributes = request.userAttributes();
+      assertThat("Unexpected attribute count.", requestAttributes, hasSize(1));
 
-  @ParameterizedTest
-  @EnumSource(UserStatusType.class)
-  void shouldConvertUserStatusWhenGettingUserDetails(UserStatusType userStatus) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder().attributes(List.of()).build())
-        .build());
+      AttributeType requestAttribute = requestAttributes.get(0);
+      assertThat("Unexpected attribute name.", requestAttribute.name(), is(ATTRIBUTE_MFA_TYPE));
+      assertThat("Unexpected attribute value.", requestAttribute.value(), is(mfaType.toString()));
+    }
 
-    AdminGetUserResponse response = AdminGetUserResponse.builder()
-        .userStatus(userStatus)
-        .build();
+    @ParameterizedTest
+    @EnumSource(UserStatusType.class)
+    void shouldConvertUserStatus(UserStatusType userStatus) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder().attributes(List.of()).build())
+          .build());
 
-    when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(response);
+      AdminGetUserResponse response = AdminGetUserResponse.builder()
+          .userStatus(userStatus)
+          .build();
 
-    UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
-    assertThat("Unexpected user status.", userAccountDetails.getUserStatus(),
-        is(userStatus.toString()));
-  }
+      when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(response);
 
-  @ParameterizedTest
-  @EnumSource(value = MfaType.class, mode = EXCLUDE, names = "NO_MFA")
-  void shouldConvertCustomMfaTypeWhenGettingUserDetails(MfaType mfaType) {
-    ListUsersResponse response = ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString()).build()
-            )
-            .build())
-        .build();
+      UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
+      assertThat("Unexpected user status.", userAccountDetails.getUserStatus(),
+          is(userStatus.toString()));
+    }
 
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(response);
+    @ParameterizedTest
+    @EnumSource(value = MfaType.class, mode = EXCLUDE, names = "NO_MFA")
+    void shouldConvertCustomMfaType(MfaType mfaType) {
+      ListUsersResponse response = ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString()).build()
+              )
+              .build())
+          .build();
 
-    UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
-    assertThat("Unexpected MFA type.", userAccountDetails.getMfaStatus(),
-        is(mfaType.toString()));
-  }
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(response);
 
-  @ParameterizedTest
-  @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
-      EMAIL_OTP          | EMAIL_OTP
-      SMS_MFA            | SMS_MFA
-      SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
-      null               | NO_MFA
-      """)
-  void shouldConvertAwsMfaPreferenceWhenGettingUserDetails(String preferredMfa, MfaType mfaType) {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder().attributes(List.of()).build())
-        .build()
-    );
+      UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
+      assertThat("Unexpected MFA type.", userAccountDetails.getMfaStatus(),
+          is(mfaType.toString()));
+    }
 
-    AdminGetUserResponse response = AdminGetUserResponse.builder().preferredMfaSetting(preferredMfa)
-        .build();
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+        EMAIL_OTP          | EMAIL_OTP
+        SMS_MFA            | SMS_MFA
+        SOFTWARE_TOKEN_MFA | SOFTWARE_TOKEN_MFA
+        null               | NO_MFA
+        """)
+    void shouldConvertAwsMfaPreference(String preferredMfa, MfaType mfaType) {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder().attributes(List.of()).build())
+          .build()
+      );
 
-    when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(response);
+      AdminGetUserResponse response = AdminGetUserResponse.builder()
+          .preferredMfaSetting(preferredMfa)
+          .build();
 
-    UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
-    assertThat("Unexpected MFA type.", userAccountDetails.getMfaStatus(), is(mfaType.toString()));
-  }
+      when(cognitoClient.adminGetUser((AdminGetUserRequest) any())).thenReturn(response);
 
-  @Test
-  void shouldReturnNoGroupsWhenUserNotFoundRetrievingGroups() {
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
-            )
-            .build())
-        .build()
-    );
-    when(cognitoClient.adminListGroupsForUser((AdminListGroupsForUserRequest) any())).thenThrow(
-        UserNotFoundException.class);
+      UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
+      assertThat("Unexpected MFA type.", userAccountDetails.getMfaStatus(), is(mfaType.toString()));
+    }
 
-    UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
-    List<String> groups = userAccountDetails.getGroups();
-    assertThat("Unexpected user groups.", groups, notNullValue());
-    assertThat("Unexpected user groups.", groups.size(), is(0));
-  }
+    @Test
+    void shouldReturnNoGroupsWhenUserNotFoundRetrievingGroups() {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
+              )
+              .build())
+          .build()
+      );
+      when(cognitoClient.adminListGroupsForUser((AdminListGroupsForUserRequest) any())).thenThrow(
+          UserNotFoundException.class);
 
-  @Test
-  void shouldReturnNoGroupsWhenUserHasNoGroups() {
-    AdminListGroupsForUserResponse response = AdminListGroupsForUserResponse.builder()
-        .groups(List.of())
-        .build();
+      UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
+      List<String> groups = userAccountDetails.getGroups();
+      assertThat("Unexpected user groups.", groups, notNullValue());
+      assertThat("Unexpected user groups.", groups.size(), is(0));
+    }
 
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
-            )
-            .build())
-        .build()
-    );
-    when(cognitoClient.adminListGroupsForUser((AdminListGroupsForUserRequest) any())).thenReturn(
-        response);
+    @Test
+    void shouldReturnNoGroupsWhenUserHasNoGroups() {
+      AdminListGroupsForUserResponse response = AdminListGroupsForUserResponse.builder()
+          .groups(List.of())
+          .build();
 
-    UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
-    List<String> groups = userAccountDetails.getGroups();
-    assertThat("Unexpected user groups.", groups, notNullValue());
-    assertThat("Unexpected user groups.", groups.size(), is(0));
-  }
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
+              )
+              .build())
+          .build()
+      );
+      when(cognitoClient.adminListGroupsForUser((AdminListGroupsForUserRequest) any())).thenReturn(
+          response);
 
-  @Test
-  void shouldReturnGroupsWhenUserHasGroups() {
-    AdminListGroupsForUserResponse response = AdminListGroupsForUserResponse.builder()
-        .groups(
-            GroupType.builder().groupName(GROUP_1).build(),
-            GroupType.builder().groupName(GROUP_2).build())
-        .build();
+      UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
+      List<String> groups = userAccountDetails.getGroups();
+      assertThat("Unexpected user groups.", groups, notNullValue());
+      assertThat("Unexpected user groups.", groups.size(), is(0));
+    }
 
-    when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
-            )
-            .build())
-        .build()
-    );
-    when(cognitoClient.adminListGroupsForUser((AdminListGroupsForUserRequest) any())).thenReturn(
-        response);
+    @Test
+    void shouldReturnGroupsWhenUserHasGroups() {
+      AdminListGroupsForUserResponse response = AdminListGroupsForUserResponse.builder()
+          .groups(
+              GroupType.builder().groupName(GROUP_1).build(),
+              GroupType.builder().groupName(GROUP_2).build())
+          .build();
 
-    UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
-    List<String> groups = userAccountDetails.getGroups();
-    assertThat("Unexpected user groups.", groups, notNullValue());
-    assertThat("Unexpected user groups.", groups.size(), is(2));
-    assertThat("Unexpected user groups.", groups, hasItems(GROUP_1, GROUP_2));
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
+              )
+              .build())
+          .build()
+      );
+      when(cognitoClient.adminListGroupsForUser((AdminListGroupsForUserRequest) any())).thenReturn(
+          response);
+
+      UserAccountDetailsDto userAccountDetails = service.getUserDetails(EMAIL);
+      List<String> groups = userAccountDetails.getGroups();
+      assertThat("Unexpected user groups.", groups, notNullValue());
+      assertThat("Unexpected user groups.", groups.size(), is(2));
+      assertThat("Unexpected user groups.", groups, hasItems(GROUP_1, GROUP_2));
+    }
+
+
+    @Test
+    void shouldSkipGroupRetrievalWhenRequireGroupsFalse() {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder()
+              .attributes(
+                  AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(SMS_MFA.toString()).build()
+              )
+              .build())
+          .build()
+      );
+
+      UserAccountDetailsDto userDetails = service.getUserDetails(USER_ID, false, true);
+
+      assertThat("Unexpected groups.", userDetails.getGroups().isEmpty(), is(true));
+      verify(cognitoClient, never()).adminListGroupsForUser((AdminListGroupsForUserRequest) any());
+    }
+
+    @Test
+    void shouldSkipMfaTypeWhenRequireMfaTypeFalse() {
+      when(cognitoClient.listUsers((ListUsersRequest) any())).thenReturn(ListUsersResponse.builder()
+          .users(UserType.builder().attributes(List.of()).build())
+          .build()
+      );
+
+      service.getUserDetails(USER_ID, false, false);
+
+      verify(cognitoClient, never()).adminGetUser((AdminGetUserRequest) any());
+    }
   }
 
   @Test

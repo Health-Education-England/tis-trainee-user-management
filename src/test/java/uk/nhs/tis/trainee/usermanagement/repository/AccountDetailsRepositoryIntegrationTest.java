@@ -34,7 +34,6 @@ import com.mongodb.client.FindIterable;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,14 +54,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import uk.nhs.tis.trainee.usermanagement.DockerImageNames;
 import uk.nhs.tis.trainee.usermanagement.config.MongoConfiguration;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 
 @DataMongoTest
 @Import(MongoConfiguration.class)
 @ActiveProfiles("test")
 @Testcontainers
-class AccountEventRepositoryIntegrationTest {
+class AccountDetailsRepositoryIntegrationTest {
 
   @Container
   @ServiceConnection
@@ -71,26 +69,22 @@ class AccountEventRepositoryIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    template.findAllAndRemove(new Query(), AccountEvent.class);
+    template.findAllAndRemove(new Query(), AccountDetails.class);
   }
 
   @Autowired
   private MongoTemplate template;
 
-  @Autowired
-  private AccountEventRepository repository;
-
   @ParameterizedTest
   @CsvSource(delimiter = '|', textBlock = """
-      _id_      | _id
-      userId    | userId
-      traineeId | traineeId
+      _id_       | _id
+      traineeId  | traineeId
       """)
-  void shouldCreateSingleFieldIndexes(String indexName, String fieldName) {
-    IndexOperations indexOperations = template.indexOps(AccountEvent.class);
+  void shouldCreateSimpleIndexes(String indexName, String fieldName) {
+    IndexOperations indexOperations = template.indexOps(AccountDetails.class);
     List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
-    assertThat("Unexpected index count.", indexes, hasSize(3));
+    assertThat("Unexpected index count.", indexes, hasSize(4));
 
     IndexInfo index = indexes.stream()
         .filter(i -> i.getName().equals(indexName))
@@ -111,12 +105,42 @@ class AccountEventRepositoryIntegrationTest {
     assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
   }
 
+  @ParameterizedTest
+  @CsvSource(delimiter = '|', textBlock = """
+      sub   | sub
+      email | email
+      """)
+  void shouldCreateUniqueIndexes(String indexName, String fieldName) {
+    IndexOperations indexOperations = template.indexOps(AccountDetails.class);
+    List<IndexInfo> indexes = indexOperations.getIndexInfo();
+
+    assertThat("Unexpected index count.", indexes, hasSize(4));
+
+    IndexInfo index = indexes.stream()
+        .filter(i -> i.getName().equals(indexName))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Expected index not found."));
+
+    List<IndexField> indexFields = index.getIndexFields();
+    assertThat("Unexpected index field count.", indexFields, hasSize(1));
+
+    IndexField indexField = indexFields.get(0);
+    assertThat("Unexpected index field key.", indexField.getKey(), is(fieldName));
+    assertThat("Unexpected index field direction.", indexField.getDirection(), is(ASC));
+
+    assertThat("Unexpected hidden index.", index.isHidden(), is(false));
+    assertThat("Unexpected hashed index.", index.isHashed(), is(false));
+    assertThat("Unexpected sparse index.", index.isSparse(), is(false));
+    assertThat("Unexpected unique index.", index.isUnique(), is(true));
+    assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
+  }
+
   @Test
   void shouldStoreWithUuidIdType() throws JsonProcessingException {
-    AccountEvent event = AccountEvent.builder().build();
-    template.insert(event);
+    AccountDetails account = AccountDetails.builder().build();
+    template.insert(account);
 
-    String document = template.execute(AccountEvent.class, collection -> {
+    String document = template.execute(AccountDetails.class, collection -> {
       FindIterable<Document> documents = collection.find();
       return documents.cursor().next().toJson();
     });
@@ -128,63 +152,22 @@ class AccountEventRepositoryIntegrationTest {
   }
 
   @Test
-  void shouldSetCreatedWhenInserted() {
-    AccountEvent event = AccountEvent.builder().build();
-    template.insert(event);
+  void shouldPopulateLastModified() {
+    AccountDetails account = AccountDetails.builder()
+        .sub("test-sub")
+        .email("test@example.com")
+        .traineeId("test-trainee-id")
+        .build();
+    template.insert(account);
 
-    List<AccountEvent> savedRecords = template.find(new Query(), AccountEvent.class);
+    List<AccountDetails> savedRecords = template.find(new Query(), AccountDetails.class);
     assertThat("Unexpected saved records.", savedRecords.size(), is(1));
-    AccountEvent savedRecord = savedRecords.get(0);
+    AccountDetails savedRecord = savedRecords.get(0);
     assertThat("Unexpected saved record id.", savedRecord.id(), notNullValue());
     Instant roughlyNow = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-    Instant roughlyCreated = savedRecord.created().truncatedTo(ChronoUnit.SECONDS);
-    assertThat("Unexpected saved record created timestamp.", roughlyCreated.equals(roughlyNow),
+    Instant roughlyModified = savedRecord.lastModified().truncatedTo(ChronoUnit.SECONDS);
+    assertThat("Unexpected saved record lastModified timestamp.",
+        roughlyModified.equals(roughlyNow),
         is(true));
-  }
-
-  @Test
-  void shouldReturnEmptyWhenNoEmailUpdateEventForTrainee() {
-    Optional<AccountEvent> result = repository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
-        "unknown-trainee", AccountEventType.EMAIL_UPDATED);
-
-    assertThat("Unexpected result.", result.isPresent(), is(false));
-  }
-
-  @Test
-  void shouldReturnLatestEmailUpdateEventForTrainee() {
-    AccountEvent olderEvent = AccountEvent.builder()
-        .traineeId("trainee-1")
-        .type(AccountEventType.EMAIL_UPDATED)
-        .created(Instant.now().minus(1, ChronoUnit.HOURS))
-        .build();
-    template.insert(olderEvent);
-
-    AccountEvent newerEvent = AccountEvent.builder()
-        .traineeId("trainee-1")
-        .type(AccountEventType.EMAIL_UPDATED)
-        .created(Instant.now())
-        .build();
-    newerEvent = template.insert(newerEvent);
-
-    Optional<AccountEvent> result = repository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
-        "trainee-1", AccountEventType.EMAIL_UPDATED);
-
-    assertThat("Unexpected result.", result.isPresent(), is(true));
-    AccountEvent found = result.get();
-    assertThat("Unexpected event id.", found.id(), is(newerEvent.id()));
-  }
-
-  @Test
-  void shouldNotReturnEmailUpdateEventForDifferentTrainee() {
-    AccountEvent event = AccountEvent.builder()
-        .traineeId("trainee-2")
-        .type(AccountEventType.EMAIL_UPDATED)
-        .build();
-    template.insert(event);
-
-    Optional<AccountEvent> result = repository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
-        "trainee-1", AccountEventType.EMAIL_UPDATED);
-
-    assertThat("Unexpected result.", result.isPresent(), is(false));
   }
 }

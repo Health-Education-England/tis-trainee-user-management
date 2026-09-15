@@ -19,31 +19,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.config;
+package uk.nhs.tis.trainee.usermanagement.dto;
 
-import java.util.UUID;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.mongodb.config.EnableMongoAuditing;
-import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
-import uk.nhs.tis.trainee.usermanagement.model.UuidIdentifiedEntity;
+import java.time.Instant;
 
 /**
- * Configuration class for MongoDB settings and callbacks.
+ * Represents a Cognito event.
+ *
+ * @param eventName           The name of the Cognito event.
+ * @param eventTime           The time the event occurred.
+ * @param additionalEventData Additional data associated with the event.
  */
-@Configuration
-@EnableMongoAuditing
-public class MongoConfiguration {
+public record CognitoEventDto(String eventName, Instant eventTime,
+                              AdditionalEventData additionalEventData) {
 
   /**
-   * Generates a random UUID for the ID field of a UuidIdentifiedEntity if it is not already set
-   * before saving to MongoDB.
+   * Represents additional data associated with a Cognito event.
    *
-   * @return a BeforeConvertCallback that sets the ID of a UuidIdentifiedEntity to a random UUID if
-   *      it is null.
+   * @param sub The subject identifier of the user associated with the event.
    */
-  @Bean
-  public BeforeConvertCallback<UuidIdentifiedEntity> accountEventBeforeConvertCallback() {
-    return (entity, collection) -> entity.id() == null ? entity.withId(UUID.randomUUID()) : entity;
+  public record AdditionalEventData(String sub) {
+
   }
 }

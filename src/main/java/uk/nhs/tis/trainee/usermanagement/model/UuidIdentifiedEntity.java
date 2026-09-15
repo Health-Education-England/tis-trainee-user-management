@@ -19,44 +19,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.config;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
+package uk.nhs.tis.trainee.usermanagement.model;
 
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 
-class MongoConfigurationTest {
+/**
+ * Interface for entities identified by a UUID.
+ */
+public interface UuidIdentifiedEntity {
 
-  private MongoConfiguration configuration;
+  /**
+   * Get the UUID identifier of the entity.
+   *
+   * @return The UUID identifier.
+   */
+  UUID id();
 
-  @BeforeEach
-  void setUp() {
-    configuration = new MongoConfiguration();
-  }
-
-  @Test
-  void shouldPopulateIdBeforeConvertWhenIdNull() {
-    AccountEvent event = AccountEvent.builder().build();
-
-    event = (AccountEvent) configuration.accountEventBeforeConvertCallback()
-        .onBeforeConvert(event, "");
-
-    assertThat("Unexpected event ID.", event.id(), notNullValue());
-  }
-
-  @Test
-  void shouldNotModifyIdBeforeConvertWhenIdPopulated() {
-    UUID uuid = UUID.randomUUID();
-    AccountEvent event = AccountEvent.builder().id(uuid).build();
-
-    event = (AccountEvent) configuration.accountEventBeforeConvertCallback()
-        .onBeforeConvert(event, "");
-
-    assertThat("Unexpected event ID.", event.id(), is(uuid));
-  }
+  /**
+   * Create a copy of the entity with the given UUID identifier.
+   *
+   * @param id The UUID identifier to set.
+   * @return A new instance of the entity with the specified UUID identifier.
+   */
+  UuidIdentifiedEntity withId(UUID id);
 }

@@ -3,6 +3,10 @@ application:
     cognito:
       user-pool-id: eu-west-2_dummy
       beta-participant-group: test_group
+    sqs:
+        cognito-events: tis-trainee-user-management-local-cognito-events
+        contact-details:
+            updated: tis-trainee-user-management-local-contact-details-updated
 
 spring:
   cloud:
@@ -13,3 +17,4 @@ spring:
         enabled: false
       sqs:
         enabled: false
+
