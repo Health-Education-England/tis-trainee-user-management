@@ -18,9 +18,9 @@ application:
       profile-move:
         request: ${PROFILE_MOVE_EVENT_TOPIC:}
     sqs:
-      cognito-events: ${COGNITO_EVENTS_QUEUE:}
+      cognito-events: tis-trainee-user-management-${application.environment}-eventbridge-cognito-event.fifo
       contact-details:
-        updated: ${CONTACT_DETAILS_UPDATED_QUEUE:}
+        updated: tis-trainee-user-management-${application.environment}-contact-details-updated.fifo
       request: ${REQUEST_QUEUE_URL:}
   environment: ${ENVIRONMENT:local}
   cache:
