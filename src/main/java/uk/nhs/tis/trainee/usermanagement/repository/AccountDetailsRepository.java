@@ -19,44 +19,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.config;
+package uk.nhs.tis.trainee.usermanagement.repository;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
-
+import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 
-class MongoConfigurationTest {
+/**
+ * Repository for {@link AccountDetails} entities.
+ */
+public interface AccountDetailsRepository extends MongoRepository<AccountDetails, UUID> {
 
-  private MongoConfiguration configuration;
+  /**
+   * Find account details for a given sub.
+   *
+   * @param sub The sub of the account to find.
+   * @return The account details, if found.
+   */
+  Optional<AccountDetails> findBySub(String sub);
 
-  @BeforeEach
-  void setUp() {
-    configuration = new MongoConfiguration();
-  }
-
-  @Test
-  void shouldPopulateIdBeforeConvertWhenIdNull() {
-    AccountEvent event = AccountEvent.builder().build();
-
-    event = (AccountEvent) configuration.accountEventBeforeConvertCallback()
-        .onBeforeConvert(event, "");
-
-    assertThat("Unexpected event ID.", event.id(), notNullValue());
-  }
-
-  @Test
-  void shouldNotModifyIdBeforeConvertWhenIdPopulated() {
-    UUID uuid = UUID.randomUUID();
-    AccountEvent event = AccountEvent.builder().id(uuid).build();
-
-    event = (AccountEvent) configuration.accountEventBeforeConvertCallback()
-        .onBeforeConvert(event, "");
-
-    assertThat("Unexpected event ID.", event.id(), is(uuid));
-  }
+  /**
+   * Delete account details for a given sub.
+   *
+   * @param sub The sub of the account to delete.
+   */
+  void deleteBySub(String sub);
 }

@@ -19,44 +19,45 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.config;
+package uk.nhs.tis.trainee.usermanagement.model;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
-
+import java.time.Instant;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
+import lombok.Builder;
+import lombok.With;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-class MongoConfigurationTest {
+/**
+ * Represents a user account, with associated user and trainee IDs.
+ *
+ * @param id           The unique identifier of the account.
+ * @param sub          The subject identifier of the user associated with the account.
+ * @param email        The email address of the user associated with the account.
+ * @param traineeId    The ID of the trainee associated with the user account.
+ * @param lastModified The timestamp of the last modification to the account.
+ */
+@Document("AccountDetails")
+@Builder
+public record AccountDetails(
+    @Id
+    @With
+    UUID id,
 
-  private MongoConfiguration configuration;
+    @Indexed(unique = true)
+    String sub,
 
-  @BeforeEach
-  void setUp() {
-    configuration = new MongoConfiguration();
-  }
+    @Indexed(unique = true)
+    @With
+    String email,
 
-  @Test
-  void shouldPopulateIdBeforeConvertWhenIdNull() {
-    AccountEvent event = AccountEvent.builder().build();
+    @Indexed
+    @With
+    String traineeId,
 
-    event = (AccountEvent) configuration.accountEventBeforeConvertCallback()
-        .onBeforeConvert(event, "");
+    @LastModifiedDate
+    Instant lastModified) implements UuidIdentifiedEntity {
 
-    assertThat("Unexpected event ID.", event.id(), notNullValue());
-  }
-
-  @Test
-  void shouldNotModifyIdBeforeConvertWhenIdPopulated() {
-    UUID uuid = UUID.randomUUID();
-    AccountEvent event = AccountEvent.builder().id(uuid).build();
-
-    event = (AccountEvent) configuration.accountEventBeforeConvertCallback()
-        .onBeforeConvert(event, "");
-
-    assertThat("Unexpected event ID.", event.id(), is(uuid));
-  }
 }

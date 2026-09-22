@@ -55,12 +55,15 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.TooManyRequ
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserStatusType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
+import uk.nhs.tis.trainee.usermanagement.dto.CognitoEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.EmailUpdateEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 
 /**
@@ -91,6 +94,7 @@ public class UserAccountService {
   private final AuditService auditService;
   private final EventPublishService eventPublishService;
   private final AccountEventRepository accountEventRepository;
+  private final AccountDetailsRepository accountDetailsRepository;
   private final AccountEventMapper accountEventMapper;
 
   private Instant lastUserCaching = null;
@@ -99,7 +103,8 @@ public class UserAccountService {
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
       CacheManager cacheManager, EventPublishService eventPublishService,
       MetricsService metricsService, AuditService auditService,
-      AccountEventRepository accountEventRepository, AccountEventMapper accountEventMapper) {
+      AccountEventRepository accountEventRepository,
+      AccountDetailsRepository accountDetailsRepository, AccountEventMapper accountEventMapper) {
     this.cognitoService = cognitoService;
     this.userPoolId = userPoolId;
     cache = cacheManager.getCache(USER_ID_CACHE);
@@ -107,6 +112,7 @@ public class UserAccountService {
     this.metricsService = metricsService;
     this.auditService = auditService;
     this.accountEventRepository = accountEventRepository;
+    this.accountDetailsRepository = accountDetailsRepository;
     this.accountEventMapper = accountEventMapper;
   }
 
@@ -520,5 +526,39 @@ public class UserAccountService {
     return accountEventRepository.findFirstByTraineeIdAndTypeOrderByCreatedDesc(
             traineeId, AccountEventType.EMAIL_UPDATED)
         .map(accountEventMapper::toEmailUpdateEventDto);
+  }
+
+  /**
+   * Update the account details based on a Cognito event.
+   *
+   * @param event The Cognito event containing the account details to update.
+   */
+  public void updateAccountDetails(CognitoEventDto event) {
+    String sub = event.additionalEventData().sub();
+    String eventName = event.eventName();
+    log.info("Handling {} event for user '{}'.", eventName, sub);
+
+    switch (eventName) {
+      case "AdminDeleteUser", "DeleteUser" -> {
+        log.info("Deleting account details for user '{}'.", sub);
+        accountDetailsRepository.deleteBySub(sub);
+      }
+      case "AdminCreateUser", "SignUp", "AdminUpdateUserAttributes", "UpdateUserAttributes" -> {
+        UserAccountDetailsDto userDetails = cognitoService.getUserDetails(sub, false, false);
+        String email = userDetails.getEmail();
+        String traineeId = userDetails.getTraineeId();
+
+        accountDetailsRepository.findBySub(sub)
+            .ifPresentOrElse(
+                existingAccount -> accountDetailsRepository.save(
+                    existingAccount.withEmail(email).withTraineeId(traineeId)),
+                () -> accountDetailsRepository.insert(AccountDetails.builder()
+                    .sub(sub)
+                    .email(email)
+                    .traineeId(traineeId)
+                    .build()));
+      }
+      default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
+    }
   }
 }

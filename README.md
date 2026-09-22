@@ -25,7 +25,6 @@ gradlew bootRun
 | AWS_XRAY_DAEMON_ADDRESS         | The AWS XRay daemon host.                                 |           |
 | BETA_PARTICIPANT_GROUP          | The name of the Cognito user group for beta participants. |           |
 | COGNITO_USER_POOL_ID            | The ID of the Cognito user pool to manage.                |           |
-| CONTACT_DETAILS_UPDATED_QUEUE   | The ARN of a queue to received contact detail events.     |           |
 | ENVIRONMENT                     | The environment to log events against.                    | local     |
 | PROFILE_HOST                    | The host of TIS-Profile service.                          | localhost |
 | PROFILE_PORT                    | The port number of TIS-Profile service.                   | 8082      |

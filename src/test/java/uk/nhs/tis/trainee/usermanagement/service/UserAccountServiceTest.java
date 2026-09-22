@@ -29,6 +29,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.cache.Cache;
@@ -77,13 +79,17 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRe
 import software.amazon.awssdk.services.cognitoidentityprovider.model.TooManyRequestsException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
+import uk.nhs.tis.trainee.usermanagement.dto.CognitoEventDto;
+import uk.nhs.tis.trainee.usermanagement.dto.CognitoEventDto.AdditionalEventData;
 import uk.nhs.tis.trainee.usermanagement.dto.EmailUpdateEventDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 
 class UserAccountServiceTest {
@@ -117,6 +123,7 @@ class UserAccountServiceTest {
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
   private AccountEventRepository accountEventRepository;
+  private AccountDetailsRepository accountDetailsRepository;
   private AccountEventMapper accountEventMapper;
 
   @BeforeEach
@@ -130,12 +137,13 @@ class UserAccountServiceTest {
     auditService = mock(AuditService.class);
     eventPublishService = mock(EventPublishService.class);
     metricsService = mock(MetricsService.class);
+    accountDetailsRepository = mock(AccountDetailsRepository.class);
     accountEventRepository = mock(AccountEventRepository.class);
     accountEventMapper = mock(AccountEventMapper.class);
 
     service = spy(new UserAccountService(cognitoService, USER_POOL_ID, cacheManager,
         eventPublishService, metricsService, auditService, accountEventRepository,
-        accountEventMapper));
+        accountDetailsRepository, accountEventMapper));
   }
 
   @Test
@@ -972,5 +980,110 @@ class UserAccountServiceTest {
     assertThat("Unexpected result.", result.isPresent(), is(true));
     assertThat("Unexpected dto.", result.get(), is(dto));
     verify(accountEventMapper).toEmailUpdateEventDto(event);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminDeleteUser", "DeleteUser"})
+  void shouldDeleteAccountWhenUserNotFoundDuringDeleteEvent(String apiName) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    service.updateAccountDetails(event);
+
+    verify(accountDetailsRepository).deleteBySub(USER_ID_1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
+      "UpdateUserAttributes"})
+  void shouldThrowWhenUserNotFoundForCreateOrUpdateEvent(String apiName) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenThrow(
+        UserNotFoundException.class);
+
+    assertThrows(UserNotFoundException.class, () -> service.updateAccountDetails(event));
+    verify(accountDetailsRepository, never()).deleteBySub(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
+      "UpdateUserAttributes"})
+  void shouldUpdateExistingAccountWhenAccountDetailsExist(String apiName) {
+    String newEmail = "new@example.com";
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
+
+    UUID accountDetailsId = UUID.randomUUID();
+    AccountDetails existingAccount = AccountDetails.builder()
+        .id(accountDetailsId)
+        .sub(USER_ID_1)
+        .email("existing@example.com")
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(existingAccount));
+
+    service.updateAccountDetails(event);
+
+    ArgumentCaptor<AccountDetails> accountCaptor = ArgumentCaptor.captor();
+    verify(accountDetailsRepository).save(accountCaptor.capture());
+
+    AccountDetails savedAccount = accountCaptor.getValue();
+    assertThat("Unexpected id.", savedAccount.id(), is(accountDetailsId));
+    assertThat("Unexpected sub.", savedAccount.sub(), is(USER_ID_1));
+    assertThat("Unexpected email.", savedAccount.email(), is("new@example.com"));
+    assertThat("Unexpected trainee ID.", savedAccount.traineeId(), is(TRAINEE_ID_2));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
+      "UpdateUserAttributes"})
+  void shouldInsertNewAccountWhenAccountDetailsNotExist(String apiName) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(EMAIL)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.empty());
+
+    service.updateAccountDetails(event);
+
+    ArgumentCaptor<AccountDetails> accountCaptor = ArgumentCaptor.captor();
+    verify(accountDetailsRepository).insert(accountCaptor.capture());
+
+    AccountDetails insertedAccount = accountCaptor.getValue();
+    assertThat("Unexpected id.", insertedAccount.id(), nullValue());
+    assertThat("Unexpected sub.", insertedAccount.sub(), is(USER_ID_1));
+    assertThat("Unexpected email.", insertedAccount.email(), is(EMAIL));
+    assertThat("Unexpected trainee ID.", insertedAccount.traineeId(), is(TRAINEE_ID_1));
+  }
+
+  @Test
+  void shouldIgnoreUnexpectedCognitoEventName() {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto("UnexpectedEventName", Instant.now(),
+        additionalEventData);
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .build();
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
+
+    service.updateAccountDetails(event);
+
+    verify(accountDetailsRepository, never()).save(any());
+    verify(accountDetailsRepository, never()).insert(anyCollection());
   }
 }
