@@ -24,6 +24,7 @@ package uk.nhs.tis.trainee.usermanagement.api.internal;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,5 +48,6 @@ public class AccountDetailsResourceTest {
     ResponseEntity<Void> response = controller.reconcileAccountDetails();
 
     assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(service).reconcileAccountDetails();
   }
 }

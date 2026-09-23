@@ -49,7 +49,7 @@ public record AccountDetails(
     @Indexed(unique = true)
     String sub,
 
-    @Indexed(unique = true)
+    @Indexed(unique = true, sparse = true)
     @With
     String email,
 

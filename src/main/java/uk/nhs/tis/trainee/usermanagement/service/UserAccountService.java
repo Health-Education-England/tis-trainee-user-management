@@ -568,7 +568,7 @@ public class UserAccountService {
           .toList();
       BulkWriteResult upsertResult = accountDetailsRepository.bulkUpsertBySub(upsertRequests);
       modified += upsertResult.getModifiedCount();
-      inserted += upsertResult.getInsertedCount();
+      inserted += upsertResult.getUpserts().size();
       paginationToken = cognitoResult.paginationToken();
     } while (paginationToken != null);
 
@@ -577,7 +577,8 @@ public class UserAccountService {
         startTime.minus(Duration.ofMinutes(5)));
 
     log.info(
-        "Reconciliation of account details completed, total time taken: {}s, modified: {}, inserted: {}, deleted: {}",
+        "Reconciliation of account details completed,"
+            + "total time taken: {}s, modified: {}, inserted: {}, deleted: {}",
         Duration.between(startTime, Instant.now()).toSeconds(), modified, inserted, deleted);
   }
 

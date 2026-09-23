@@ -132,7 +132,7 @@ class AccountDetailsResourceIntegrationTest {
     when(cognitoClient.listUsers(any(ListUsersRequest.class))).thenReturn(cognitoResponse);
 
     Instant oldLastModified = Instant.now().minus(Duration.ofMinutes(10));
-    AccountDetails existingAccount = mongoTemplate.insert(AccountDetails.builder()
+    final AccountDetails existingAccount = mongoTemplate.insert(AccountDetails.builder()
         .sub(EXISTING_SUB)
         .email("stale@example.com")
         .traineeId("stale-trainee")

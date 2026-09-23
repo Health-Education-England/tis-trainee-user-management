@@ -1008,7 +1008,7 @@ class UserAccountServiceTest {
     when(accountDetailsRepository.bulkUpsertBySub(any())).thenReturn(bulkWriteResult);
     when(accountDetailsRepository.deleteByLastModifiedBefore(any())).thenReturn(1L);
 
-    Instant startTime = Instant.now();
+    final Instant startTime = Instant.now();
 
     service.reconcileAccountDetails();
 

@@ -35,7 +35,8 @@ public interface AccountDetailsRepositoryCustom {
   /**
    * Upsert (update or insert) account details based on the provided
    * {@link AccountDetailsUpsertRequest} object. If an account with the same sub exists, it will be
-   * updated; otherwise, a new account will be created.
+   * updated; otherwise, a new account will be created. Any existing accounts linked to one of the
+   * request email will have their email unset.
    *
    * @param upsertRequest The account details to upsert.
    */
@@ -44,7 +45,8 @@ public interface AccountDetailsRepositoryCustom {
   /**
    * Bulk upsert (update or insert) account details based on the provided list of
    * {@link AccountDetailsUpsertRequest} objects. If an account with the same sub exists, it will be
-   * updated; otherwise, a new account will be created.
+   * updated; otherwise, a new account will be created. Any existing accounts linked to one of the
+   * request emails will have their email unset.
    *
    * @param upsertRequests The list of account details to upsert.
    * @return The result of the bulk write operation.

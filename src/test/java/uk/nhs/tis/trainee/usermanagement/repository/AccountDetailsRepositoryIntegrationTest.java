@@ -22,15 +22,18 @@
 package uk.nhs.tis.trainee.usermanagement.repository;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.data.domain.Sort.Direction.ASC;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mongodb.client.FindIterable;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -114,10 +117,10 @@ class AccountDetailsRepositoryIntegrationTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-        sub   | sub
-        email | email
+        sub   | sub   | false
+        email | email | true
         """)
-    void shouldCreateUniqueIndexes(String indexName, String fieldName) {
+    void shouldCreateUniqueIndexes(String indexName, String fieldName, boolean sparse) {
       IndexOperations indexOperations = template.indexOps(AccountDetails.class);
       List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
@@ -137,7 +140,7 @@ class AccountDetailsRepositoryIntegrationTest {
 
       assertThat("Unexpected hidden index.", index.isHidden(), is(false));
       assertThat("Unexpected hashed index.", index.isHashed(), is(false));
-      assertThat("Unexpected sparse index.", index.isSparse(), is(false));
+      assertThat("Unexpected sparse index.", index.isSparse(), is(sparse));
       assertThat("Unexpected unique index.", index.isUnique(), is(true));
       assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
     }
@@ -171,11 +174,9 @@ class AccountDetailsRepositoryIntegrationTest {
       assertThat("Unexpected saved records.", savedRecords.size(), is(1));
       AccountDetails savedRecord = savedRecords.get(0);
       assertThat("Unexpected saved record id.", savedRecord.id(), notNullValue());
-      Instant roughlyNow = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-      Instant roughlyModified = savedRecord.lastModified().truncatedTo(ChronoUnit.SECONDS);
       assertThat("Unexpected saved record lastModified timestamp.",
-          roughlyModified.equals(roughlyNow),
-          is(true));
+          (double) Duration.between(savedRecord.lastModified(), Instant.now()).toSeconds(),
+          closeTo(0, 1));
     }
   }
 
@@ -211,8 +212,8 @@ class AccountDetailsRepositoryIntegrationTest {
       AccountDetails inserted = template.insert(AccountDetails.builder()
           .sub(SUB)
           .build());
-      UUID id = inserted.id();
-      Instant lastModified = inserted.lastModified();
+      final UUID id = inserted.id();
+      final Instant lastModified = inserted.lastModified();
 
       AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
           .sub(SUB)
@@ -227,6 +228,99 @@ class AccountDetailsRepositoryIntegrationTest {
       assertThat("Unexpected id.", accountDetails.get().id(), is(id));
       assertThat("lastModified should be updated.",
           accountDetails.get().lastModified().isAfter(lastModified), is(true));
+    }
+
+    @Test
+    void shouldNotUpdateLastModifiedWhenUnsettingStaleEmail() {
+      AccountDetails staleAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .email(EMAIL)
+          .traineeId(UUID.randomUUID().toString())
+          .build());
+      final UUID staleId = staleAccount.id();
+      final Instant staleLastModified = staleAccount.lastModified().truncatedTo(ChronoUnit.MILLIS);
+
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.upsertBySub(request);
+
+      Optional<AccountDetails> staleAccountDetails = repository.findById(staleId);
+      assertThat("Expected stale account details to still be present.",
+          staleAccountDetails.isPresent(), is(true));
+      assertThat("email should have been unset.", staleAccountDetails.get().email(),
+          is(nullValue()));
+      assertThat("lastModified should not be updated.",
+          staleAccountDetails.get().lastModified(), is(staleLastModified));
+    }
+
+    @Test
+    void shouldPopulateMetadataOnBulkUpsertInsert() {
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.bulkUpsertBySub(List.of(request));
+
+      Optional<AccountDetails> accountDetails = repository.findBySub(SUB);
+      assertThat("Expected account details to be present.", accountDetails.isPresent(), is(true));
+      assertThat("Unexpected id.", accountDetails.get().id(), notNullValue());
+      assertThat("Unexpected lastModified.", accountDetails.get().lastModified(), notNullValue());
+    }
+
+    @Test
+    void shouldUpdateMetadataOnBulkUpsertUpdate() {
+      AccountDetails inserted = template.insert(AccountDetails.builder()
+          .sub(SUB)
+          .build());
+      final UUID id = inserted.id();
+      final Instant lastModified = inserted.lastModified();
+
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.bulkUpsertBySub(List.of(request));
+
+      Optional<AccountDetails> accountDetails = repository.findById(id);
+      assertThat("Expected account details to be present.", accountDetails.isPresent(), is(true));
+      assertThat("Unexpected id.", accountDetails.get().id(), is(id));
+      assertThat("lastModified should be updated.",
+          accountDetails.get().lastModified().isAfter(lastModified), is(true));
+    }
+
+    @Test
+    void shouldNotUpdateLastModifiedWhenBulkUnsettingStaleEmail() {
+      AccountDetails staleAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .email(EMAIL)
+          .traineeId(UUID.randomUUID().toString())
+          .build());
+      final UUID staleId = staleAccount.id();
+      final Instant staleLastModified = staleAccount.lastModified().truncatedTo(ChronoUnit.MILLIS);
+
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.bulkUpsertBySub(List.of(request));
+
+      Optional<AccountDetails> staleAccountDetails = repository.findById(staleId);
+      assertThat("Expected stale account details to still be present.",
+          staleAccountDetails.isPresent(), is(true));
+      assertThat("email should have been unset.", staleAccountDetails.get().email(),
+          is(nullValue()));
+      assertThat("lastModified should not be updated.",
+          staleAccountDetails.get().lastModified(), is(staleLastModified));
     }
   }
 }
