@@ -19,40 +19,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.repository;
+package uk.nhs.tis.trainee.usermanagement.api.internal;
 
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
-import org.springframework.data.mongodb.repository.MongoRepository;
-import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.mock;
 
-/**
- * Repository for {@link AccountDetails} entities.
- */
-public interface AccountDetailsRepository extends MongoRepository<AccountDetails, UUID>,
-    AccountDetailsRepositoryCustom {
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
-  /**
-   * Find account details for a given sub.
-   *
-   * @param sub The sub of the account to find.
-   * @return The account details, if found.
-   */
-  Optional<AccountDetails> findBySub(String sub);
+public class AccountDetailsResourceTest {
 
-  /**
-   * Delete account details for a given sub.
-   *
-   * @param sub The sub of the account to delete.
-   */
-  void deleteBySub(String sub);
+  private AccountDetailsResource controller;
+  private UserAccountService service;
 
-  /**
-   * Delete account details that were last modified before the given timestamp.
-   *
-   * @param timestamp The timestamp to compare against.
-   * @return The number of account details deleted.
-   */
-  long deleteByLastModifiedBefore(Instant timestamp);
+  @BeforeEach
+  void setUp() {
+    service = mock(UserAccountService.class);
+    controller = new AccountDetailsResource(service);
+  }
+
+  @Test
+  void shouldReconcileAccountDetails() {
+    ResponseEntity<Void> response = controller.reconcileAccountDetails();
+
+    assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+  }
 }

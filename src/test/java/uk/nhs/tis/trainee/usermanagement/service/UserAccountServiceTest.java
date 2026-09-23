@@ -25,11 +25,11 @@ import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -42,6 +42,8 @@ import static software.amazon.awssdk.services.cognitoidentityprovider.model.User
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SOFTWARE_TOKEN_MFA;
 
+import com.mongodb.bulk.BulkWriteResult;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +55,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -86,10 +89,10 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
-import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepositoryCustom.AccountDetailsUpsertRequest;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 
 class UserAccountServiceTest {
@@ -982,6 +985,167 @@ class UserAccountServiceTest {
     verify(accountEventMapper).toEmailUpdateEventDto(event);
   }
 
+  @Test
+  void shouldReconcileAccountDetails() {
+    UserType user1 = UserType.builder()
+        .attributes(
+            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build(),
+            AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build())
+        .build();
+    UserType user2 = UserType.builder()
+        .attributes(
+            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build(),
+            AttributeType.builder().name(ATTRIBUTE_EMAIL).value("second@example.com").build(),
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build())
+        .build();
+
+    when(cognitoService.listUsers(any())).thenReturn(ListUsersResponse.builder()
+        .users(user1, user2)
+        .build());
+
+    BulkWriteResult bulkWriteResult = mock(BulkWriteResult.class);
+    when(accountDetailsRepository.bulkUpsertBySub(any())).thenReturn(bulkWriteResult);
+    when(accountDetailsRepository.deleteByLastModifiedBefore(any())).thenReturn(1L);
+
+    Instant startTime = Instant.now();
+
+    service.reconcileAccountDetails();
+
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.captor();
+    verify(cognitoService).listUsers(listUsersCaptor.capture());
+
+    ListUsersRequest listUsersRequest = listUsersCaptor.getValue();
+    assertThat("Unexpected user pool.", listUsersRequest.userPoolId(), is(USER_POOL_ID));
+    assertThat("Unexpected pagination token.", listUsersRequest.paginationToken(), nullValue());
+
+    ArgumentCaptor<List<AccountDetailsUpsertRequest>> upsertCaptor = ArgumentCaptor.captor();
+    verify(accountDetailsRepository).bulkUpsertBySub(upsertCaptor.capture());
+
+    List<AccountDetailsUpsertRequest> upsertRequests = upsertCaptor.getValue();
+    assertThat("Unexpected request count.", upsertRequests, hasSize(2));
+
+    AccountDetailsUpsertRequest request1 = upsertRequests.get(0);
+    assertThat("Unexpected request sub.", request1.sub(), is(USER_ID_1));
+    assertThat("Unexpected request email.", request1.email(), is(EMAIL));
+    assertThat("Unexpected request trainee ID.", request1.traineeId(), is(TRAINEE_ID_1));
+
+    AccountDetailsUpsertRequest request2 = upsertRequests.get(1);
+    assertThat("Unexpected request sub.", request2.sub(), is(USER_ID_2));
+    assertThat("Unexpected request email.", request2.email(), is("second@example.com"));
+    assertThat("Unexpected request trainee ID.", request2.traineeId(), is(TRAINEE_ID_2));
+
+    ArgumentCaptor<Instant> deleteCaptor = ArgumentCaptor.captor();
+    verify(accountDetailsRepository).deleteByLastModifiedBefore(deleteCaptor.capture());
+
+    Instant deleteTimestamp = deleteCaptor.getValue();
+    long deleteBufferSeconds = Duration.between(deleteTimestamp, startTime).toSeconds();
+    assertThat("Unexpected delete timestamp buffer.", (double) deleteBufferSeconds,
+        closeTo(300, 1L));
+  }
+
+  @Test
+  void shouldPaginateThroughAllUsersWhenReconcilingAccountDetails() {
+    UserType user1 = UserType.builder()
+        .attributes(
+            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build(),
+            AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build())
+        .build();
+    UserType user2 = UserType.builder()
+        .attributes(
+            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build(),
+            AttributeType.builder().name(ATTRIBUTE_EMAIL).value("second@example.com").build(),
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build())
+        .build();
+
+    ListUsersResponse result1 = ListUsersResponse.builder()
+        .users(user1)
+        .paginationToken("tokenforpage2")
+        .build();
+    ListUsersResponse result2 = ListUsersResponse.builder()
+        .users(user2)
+        .build();
+
+    ArgumentCaptor<ListUsersRequest> listUsersCaptor = ArgumentCaptor.captor();
+    when(cognitoService.listUsers(listUsersCaptor.capture())).thenReturn(result1, result2);
+
+    BulkWriteResult bulkWriteResult1 = mock(BulkWriteResult.class);
+    BulkWriteResult bulkWriteResult2 = mock(BulkWriteResult.class);
+    when(accountDetailsRepository.bulkUpsertBySub(any())).thenReturn(bulkWriteResult1,
+        bulkWriteResult2);
+    when(accountDetailsRepository.deleteByLastModifiedBefore(any())).thenReturn(1L);
+
+    service.reconcileAccountDetails();
+
+    List<ListUsersRequest> listUsersRequests = listUsersCaptor.getAllValues();
+    assertThat("Unexpected request count.", listUsersRequests, hasSize(2));
+    assertThat("Unexpected pagination token.", listUsersRequests.get(0).paginationToken(),
+        nullValue());
+    assertThat("Unexpected pagination token.", listUsersRequests.get(1).paginationToken(),
+        is("tokenforpage2"));
+
+    ArgumentCaptor<List<AccountDetailsUpsertRequest>> upsertCaptor = ArgumentCaptor.captor();
+    verify(accountDetailsRepository, times(2)).bulkUpsertBySub(upsertCaptor.capture());
+
+    List<List<AccountDetailsUpsertRequest>> upsertBatches = upsertCaptor.getAllValues();
+    assertThat("Unexpected upsert batch count.", upsertBatches, hasSize(2));
+    assertThat("Unexpected batch request count.", upsertBatches.get(0), hasSize(1));
+    assertThat("Unexpected batch sub.", upsertBatches.get(0).get(0).sub(), is(USER_ID_1));
+    assertThat("Unexpected batch request count.", upsertBatches.get(1), hasSize(1));
+    assertThat("Unexpected batch sub.", upsertBatches.get(1).get(0).sub(), is(USER_ID_2));
+
+    InOrder inOrder = inOrder(cognitoService, accountDetailsRepository);
+    inOrder.verify(cognitoService).listUsers(any());
+    inOrder.verify(accountDetailsRepository).bulkUpsertBySub(any());
+    inOrder.verify(cognitoService).listUsers(any());
+    inOrder.verify(accountDetailsRepository).bulkUpsertBySub(any());
+    inOrder.verify(accountDetailsRepository).deleteByLastModifiedBefore(any());
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  void shouldSkipBulkUpsertWhenNoUsersReturnedFromCognito(List<UserType> users) {
+    when(cognitoService.listUsers(any())).thenReturn(ListUsersResponse.builder()
+        .users(users)
+        .build());
+    when(accountDetailsRepository.deleteByLastModifiedBefore(any())).thenReturn(0L);
+
+    service.reconcileAccountDetails();
+
+    verify(cognitoService).listUsers(any());
+    verify(accountDetailsRepository, never()).bulkUpsertBySub(any());
+    verify(accountDetailsRepository).deleteByLastModifiedBefore(any());
+  }
+
+  @Test
+  void shouldNotDeleteOrphansWhenErrorReconcilingAccountDetails() {
+    UserType user1 = UserType.builder()
+        .attributes(
+            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build(),
+            AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build())
+        .build();
+
+    ListUsersResponse result1 = ListUsersResponse.builder()
+        .users(user1)
+        .paginationToken("tokenforpage2")
+        .build();
+
+    when(cognitoService.listUsers(any(ListUsersRequest.class)))
+        .thenReturn(result1)
+        .thenThrow(TooManyRequestsException.class);
+
+    BulkWriteResult bulkWriteResult1 = mock(BulkWriteResult.class);
+    when(accountDetailsRepository.bulkUpsertBySub(any())).thenReturn(bulkWriteResult1);
+
+    assertThrows(TooManyRequestsException.class, () -> service.reconcileAccountDetails());
+
+    verify(cognitoService, times(2)).listUsers(any());
+    verify(accountDetailsRepository, times(1)).bulkUpsertBySub(any());
+    verify(accountDetailsRepository, never()).deleteByLastModifiedBefore(any());
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"AdminDeleteUser", "DeleteUser"})
   void shouldDeleteAccountWhenUserNotFoundDuringDeleteEvent(String apiName) {
@@ -1010,7 +1174,7 @@ class UserAccountServiceTest {
   @ParameterizedTest
   @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
       "UpdateUserAttributes"})
-  void shouldUpdateExistingAccountWhenAccountDetailsExist(String apiName) {
+  void shouldUpsertAccountForCreateOrUpdateEvent(String apiName) {
     String newEmail = "new@example.com";
     AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
     CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
@@ -1022,52 +1186,15 @@ class UserAccountServiceTest {
         .build();
     when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
 
-    UUID accountDetailsId = UUID.randomUUID();
-    AccountDetails existingAccount = AccountDetails.builder()
-        .id(accountDetailsId)
-        .sub(USER_ID_1)
-        .email("existing@example.com")
-        .traineeId(TRAINEE_ID_1)
-        .build();
-    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(existingAccount));
-
     service.updateAccountDetails(event);
 
-    ArgumentCaptor<AccountDetails> accountCaptor = ArgumentCaptor.captor();
-    verify(accountDetailsRepository).save(accountCaptor.capture());
+    ArgumentCaptor<AccountDetailsUpsertRequest> upsertCaptor = ArgumentCaptor.captor();
+    verify(accountDetailsRepository).upsertBySub(upsertCaptor.capture());
 
-    AccountDetails savedAccount = accountCaptor.getValue();
-    assertThat("Unexpected id.", savedAccount.id(), is(accountDetailsId));
-    assertThat("Unexpected sub.", savedAccount.sub(), is(USER_ID_1));
-    assertThat("Unexpected email.", savedAccount.email(), is("new@example.com"));
-    assertThat("Unexpected trainee ID.", savedAccount.traineeId(), is(TRAINEE_ID_2));
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
-      "UpdateUserAttributes"})
-  void shouldInsertNewAccountWhenAccountDetailsNotExist(String apiName) {
-    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
-    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
-
-    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
-        .id(USER_ID_1)
-        .email(EMAIL)
-        .traineeId(TRAINEE_ID_1)
-        .build();
-    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
-    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.empty());
-
-    service.updateAccountDetails(event);
-
-    ArgumentCaptor<AccountDetails> accountCaptor = ArgumentCaptor.captor();
-    verify(accountDetailsRepository).insert(accountCaptor.capture());
-
-    AccountDetails insertedAccount = accountCaptor.getValue();
-    assertThat("Unexpected id.", insertedAccount.id(), nullValue());
-    assertThat("Unexpected sub.", insertedAccount.sub(), is(USER_ID_1));
-    assertThat("Unexpected email.", insertedAccount.email(), is(EMAIL));
-    assertThat("Unexpected trainee ID.", insertedAccount.traineeId(), is(TRAINEE_ID_1));
+    AccountDetailsUpsertRequest upsertRequest = upsertCaptor.getValue();
+    assertThat("Unexpected sub.", upsertRequest.sub(), is(USER_ID_1));
+    assertThat("Unexpected email.", upsertRequest.email(), is("new@example.com"));
+    assertThat("Unexpected trainee ID.", upsertRequest.traineeId(), is(TRAINEE_ID_2));
   }
 
   @Test
@@ -1083,7 +1210,6 @@ class UserAccountServiceTest {
 
     service.updateAccountDetails(event);
 
-    verify(accountDetailsRepository, never()).save(any());
-    verify(accountDetailsRepository, never()).insert(anyCollection());
+    verify(accountDetailsRepository, never()).upsertBySub(any());
   }
 }

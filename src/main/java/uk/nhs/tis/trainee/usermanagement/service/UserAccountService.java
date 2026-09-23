@@ -24,6 +24,7 @@ package uk.nhs.tis.trainee.usermanagement.service;
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
 
 import com.amazonaws.xray.spring.aop.XRayEnabled;
+import com.mongodb.bulk.BulkWriteResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -61,9 +62,9 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
-import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepositoryCustom.AccountDetailsUpsertRequest;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 
 /**
@@ -529,6 +530,58 @@ public class UserAccountService {
   }
 
   /**
+   * Reconcile the account details in the database with the current state of Cognito. This will get
+   * all Cognito users and update the database with their details, creating new records for any
+   * users that do not already exist in the database. Any accounts in the database that do not exist
+   * in Cognito will be deleted.
+   */
+  public void reconcileAccountDetails() {
+    log.info("Reconciling account details with Cognito.");
+
+    Instant startTime = Instant.now();
+    String paginationToken = null;
+
+    int modified = 0;
+    int inserted = 0;
+
+    do {
+      ListUsersRequest request = ListUsersRequest.builder()
+          .userPoolId(userPoolId)
+          .paginationToken(paginationToken)
+          .build();
+
+      ListUsersResponse cognitoResult = cognitoService.listUsers(request);
+      List<UserType> users = cognitoResult.users();
+      if (users == null || users.isEmpty()) {
+        paginationToken = cognitoResult.paginationToken();
+        continue;
+      }
+
+      List<AccountDetailsUpsertRequest> upsertRequests = users.stream()
+          .map(user -> user.attributes().stream()
+              .collect(Collectors.toMap(AttributeType::name, AttributeType::value)))
+          .map(attributes -> AccountDetailsUpsertRequest.builder()
+              .sub(attributes.get(ATTRIBUTE_SUB))
+              .email(attributes.get(ATTRIBUTE_EMAIL))
+              .traineeId(attributes.get(ATTRIBUTE_TIS_ID))
+              .build())
+          .toList();
+      BulkWriteResult upsertResult = accountDetailsRepository.bulkUpsertBySub(upsertRequests);
+      modified += upsertResult.getModifiedCount();
+      inserted += upsertResult.getInsertedCount();
+      paginationToken = cognitoResult.paginationToken();
+    } while (paginationToken != null);
+
+    // Any accounts which were not updated do not exist, small buffer used for any timing issues.
+    long deleted = accountDetailsRepository.deleteByLastModifiedBefore(
+        startTime.minus(Duration.ofMinutes(5)));
+
+    log.info(
+        "Reconciliation of account details completed, total time taken: {}s, modified: {}, inserted: {}, deleted: {}",
+        Duration.between(startTime, Instant.now()).toSeconds(), modified, inserted, deleted);
+  }
+
+  /**
    * Update the account details based on a Cognito event.
    *
    * @param event The Cognito event containing the account details to update.
@@ -547,16 +600,11 @@ public class UserAccountService {
         UserAccountDetailsDto userDetails = cognitoService.getUserDetails(sub, false, false);
         String email = userDetails.getEmail();
         String traineeId = userDetails.getTraineeId();
-
-        accountDetailsRepository.findBySub(sub)
-            .ifPresentOrElse(
-                existingAccount -> accountDetailsRepository.save(
-                    existingAccount.withEmail(email).withTraineeId(traineeId)),
-                () -> accountDetailsRepository.insert(AccountDetails.builder()
-                    .sub(sub)
-                    .email(email)
-                    .traineeId(traineeId)
-                    .build()));
+        accountDetailsRepository.upsertBySub(AccountDetailsUpsertRequest.builder()
+            .sub(sub)
+            .email(email)
+            .traineeId(traineeId)
+            .build());
       }
       default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
     }
