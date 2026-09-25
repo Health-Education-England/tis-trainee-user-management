@@ -44,6 +44,7 @@ public class AccountDetailsRepositoryImpl implements AccountDetailsRepositoryCus
   private static final String EMAIL_FIELD = "email";
   private static final String TRAINEE_ID_FIELD = "traineeId";
   private static final String LAST_MODIFIED_FIELD = "lastModified";
+  private static final String CLASS_FIELD = "_class";
 
   private final MongoOperations mongoOperations;
 
@@ -115,7 +116,8 @@ public class AccountDetailsRepositoryImpl implements AccountDetailsRepositoryCus
     Update update = new Update()
         .setOnInsert(ID_FIELD, UUID.randomUUID())
         .set(SUB_FIELD, request.sub())
-        .set(LAST_MODIFIED_FIELD, Instant.now());
+        .set(LAST_MODIFIED_FIELD, Instant.now())
+        .set(CLASS_FIELD, AccountDetails.class.getName());
     setOrUnset(update, EMAIL_FIELD, request.email());
     setOrUnset(update, TRAINEE_ID_FIELD, request.traineeId());
     return update;
