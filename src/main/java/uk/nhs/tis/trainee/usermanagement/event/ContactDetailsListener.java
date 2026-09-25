@@ -53,7 +53,7 @@ public class ContactDetailsListener {
 
     ContactDetailsDto dto = event.getContactDetails();
     String traineeId = dto.traineeId();
-    Set<String> userAccountIds = service.getUserAccountIds(traineeId);
+    Set<String> userAccountIds = service.getUserAccountIdsFromDatabase(traineeId);
 
     switch (userAccountIds.size()) {
       case 0 -> log.info("No account exists for trainee {}, skipping username update.", traineeId);

@@ -34,18 +34,13 @@ import io.awspring.cloud.sns.core.SnsTemplate;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -60,6 +55,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import uk.nhs.tis.trainee.usermanagement.DockerImageNames;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent.AccountEventDetail;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent.EmailUpdatedDetail;
@@ -111,9 +107,6 @@ class ContactDetailsListenerIntegrationTest {
   }
 
   @Autowired
-  private CacheManager cacheManager;
-
-  @Autowired
   private MongoTemplate mongoTemplate;
 
   @Autowired
@@ -125,23 +118,19 @@ class ContactDetailsListenerIntegrationTest {
   @MockitoBean
   private SnsTemplate snsTemplate;
 
-  private Cache cache;
-
-  @BeforeEach
-  void setUp() {
-    cache = cacheManager.getCache("UserId");
-    Objects.requireNonNull(cache);
-    cache.clear();
-  }
-
   @AfterEach
   void cleanUp() {
     mongoTemplate.findAllAndRemove(new Query(), AccountEvent.class);
+    mongoTemplate.findAllAndRemove(new Query(), AccountDetails.class);
   }
 
   @Test
   void shouldStoreAccountEventWhenContactDetailsUpdated() {
-    cache.put(TRAINEE_ID, Set.of(USER_ID));
+    mongoTemplate.insert(AccountDetails.builder()
+        .sub(USER_ID)
+        .email(USER_EMAIL_OLD)
+        .traineeId(TRAINEE_ID)
+        .build());
 
     UserAccountDetailsDto oldDetails = UserAccountDetailsDto.builder()
         .id(USER_ID)

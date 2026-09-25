@@ -62,6 +62,7 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepositoryCustom.AccountDetailsUpsertRequest;
@@ -432,6 +433,21 @@ public class UserAccountService {
 
     cognitoService.adminRemoveUserFromGroup(request);
     log.info("User '{}' has been withdrawn from the {} group.", username, groupName);
+  }
+
+  /**
+   * Get all user account IDs associated with the given person ID, using the account details
+   * database as the source of truth. Unlike {@link #getUserAccountIds(String)} this does not query
+   * Cognito when no account is found; a missing account is treated as the trainee genuinely not
+   * having an account.
+   *
+   * @param personId The person ID to get the user IDs for.
+   * @return The found user IDs, or empty if not found.
+   */
+  public Set<String> getUserAccountIdsFromDatabase(String personId) {
+    return accountDetailsRepository.findByTraineeId(personId).stream()
+        .map(AccountDetails::sub)
+        .collect(Collectors.toSet());
   }
 
   /**
