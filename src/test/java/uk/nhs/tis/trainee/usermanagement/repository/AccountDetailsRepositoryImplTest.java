@@ -94,11 +94,12 @@ class AccountDetailsRepositoryImplTest {
 
       Document set = update.get("$set", Document.class);
       assertThat("Unexpected set keys.", set.keySet(),
-          containsInAnyOrder("sub", "email", "traineeId", "lastModified"));
+          containsInAnyOrder("sub", "email", "traineeId", "lastModified", "_class"));
       assertThat("Unexpected update sub.", set.get("sub"), is(SUB));
       assertThat("Unexpected update email.", set.get("email"), is(EMAIL));
       assertThat("Unexpected update traineeId.", set.get("traineeId"), is(TRAINEE_ID));
       assertThat("Unexpected update lastModified.", set.get("lastModified"), notNullValue());
+      assertThat("Unexpected update class.", set.get("_class"), is(AccountDetails.class.getName()));
 
       Document setOnInsert = update.get("$setOnInsert", Document.class);
       assertThat("Unexpected setOnInsert keys.", setOnInsert.keySet(), containsInAnyOrder("_id"));
@@ -122,7 +123,8 @@ class AccountDetailsRepositoryImplTest {
 
       Document update = updateCaptor.getValue().getUpdateObject();
       Document set = update.get("$set", Document.class);
-      assertThat("Unexpected set keys.", set.keySet(), containsInAnyOrder("sub", "lastModified"));
+      assertThat("Unexpected set keys.", set.keySet(),
+          containsInAnyOrder("sub", "lastModified", "_class"));
 
       Document unset = update.get("$unset", Document.class);
       assertThat("Unexpected unset keys.", unset.keySet(),
@@ -222,11 +224,13 @@ class AccountDetailsRepositoryImplTest {
 
       Document firstSet = firstUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", firstSet.keySet(),
-          containsInAnyOrder("sub", "email", "traineeId", "lastModified"));
+          containsInAnyOrder("sub", "email", "traineeId", "lastModified", "_class"));
       assertThat("Unexpected update sub.", firstSet.get("sub"), is(SUB));
       assertThat("Unexpected update email.", firstSet.get("email"), is(EMAIL));
       assertThat("Unexpected update traineeId.", firstSet.get("traineeId"), is(TRAINEE_ID));
       assertThat("Unexpected update lastModified.", firstSet.get("lastModified"), notNullValue());
+      assertThat("Unexpected update class.", firstSet.get("_class"),
+          is(AccountDetails.class.getName()));
 
       Document firstSetOnInsert = firstUpdate.get("$setOnInsert", Document.class);
       assertThat("Unexpected first setOnInsert keys.", firstSetOnInsert.keySet(),
@@ -239,12 +243,14 @@ class AccountDetailsRepositoryImplTest {
 
       Document secondSet = secondUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", secondSet.keySet(),
-          containsInAnyOrder("sub", "email", "traineeId", "lastModified"));
+          containsInAnyOrder("sub", "email", "traineeId", "lastModified", "_class"));
       assertThat("Unexpected update sub.", secondSet.get("sub"), is(request2.sub()));
       assertThat("Unexpected update email.", secondSet.get("email"), is(request2.email()));
       assertThat("Unexpected update traineeId.", secondSet.get("traineeId"),
           is(request2.traineeId()));
       assertThat("Unexpected update lastModified.", secondSet.get("lastModified"), notNullValue());
+      assertThat("Unexpected update class.", secondSet.get("_class"),
+          is(AccountDetails.class.getName()));
 
       Document secondSetOnInsert = secondUpdate.get("$setOnInsert", Document.class);
       assertThat("Unexpected second setOnInsert keys.", secondSetOnInsert.keySet(),
@@ -286,14 +292,14 @@ class AccountDetailsRepositoryImplTest {
       Document firstUpdate = updates.get(0).getUpdateObject();
       Document firstSet = firstUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", firstSet.keySet(),
-          containsInAnyOrder("sub", "traineeId", "lastModified"));
+          containsInAnyOrder("sub", "traineeId", "lastModified", "_class"));
       Document firstUnset = firstUpdate.get("$unset", Document.class);
       assertThat("Unexpected unset keys.", firstUnset.keySet(), containsInAnyOrder("email"));
 
       Document secondUpdate = updates.get(1).getUpdateObject();
       Document secondSet = secondUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", secondSet.keySet(),
-          containsInAnyOrder("sub", "lastModified"));
+          containsInAnyOrder("sub", "lastModified", "_class"));
       Document secondUnset = secondUpdate.get("$unset", Document.class);
       assertThat("Unexpected unset keys.", secondUnset.keySet(),
           containsInAnyOrder("email", "traineeId"));
