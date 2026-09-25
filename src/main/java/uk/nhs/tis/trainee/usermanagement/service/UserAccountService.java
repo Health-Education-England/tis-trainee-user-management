@@ -159,6 +159,8 @@ public class UserAccountService {
 
     try {
       // Verify that the new email is not already used.
+      // Using Cognito rather than DB, even though the DB email index is unique, to avoid race
+      // conditions.
       UserAccountDetailsDto existingUser = cognitoService.getUserDetails(newEmail);
       String existingUserId = existingUser.getId();
 

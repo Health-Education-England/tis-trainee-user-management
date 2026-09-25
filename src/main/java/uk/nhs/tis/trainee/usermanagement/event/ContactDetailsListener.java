@@ -56,7 +56,9 @@ public class ContactDetailsListener {
     Set<String> userAccountIds = service.getUserAccountIdsFromDatabase(traineeId);
 
     switch (userAccountIds.size()) {
-      case 0 -> log.info("No account exists for trainee {}, skipping username update.", traineeId);
+      case 0 -> log.info(
+          "No account found in the database for trainee {}, treating the trainee as having no "
+              + "account and skipping the update. Cognito will not be queried.", traineeId);
       case 1 -> {
         String accountId = userAccountIds.iterator().next();
         service.updateContactDetails(accountId, dto.email(), dto.forenames(), dto.surname());
