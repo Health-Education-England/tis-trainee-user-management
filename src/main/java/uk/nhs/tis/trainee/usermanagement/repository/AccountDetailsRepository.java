@@ -22,6 +22,7 @@
 package uk.nhs.tis.trainee.usermanagement.repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -40,6 +41,14 @@ public interface AccountDetailsRepository extends MongoRepository<AccountDetails
    * @return The account details, if found.
    */
   Optional<AccountDetails> findBySub(String sub);
+
+  /**
+   * Find all account details associated with a given trainee ID.
+   *
+   * @param traineeId The trainee ID of the accounts to find.
+   * @return The matching account details, empty if none found.
+   */
+  List<AccountDetails> findByTraineeId(String traineeId);
 
   /**
    * Delete account details for a given sub.

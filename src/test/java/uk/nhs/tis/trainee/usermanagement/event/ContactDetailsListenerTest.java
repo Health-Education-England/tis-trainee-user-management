@@ -73,7 +73,7 @@ class ContactDetailsListenerTest {
         }""".formatted(TRAINEE_ID, EMAIL);
     ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
 
-    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(Set.of());
+    when(service.getUserAccountIdsFromDatabase(TRAINEE_ID)).thenReturn(Set.of());
 
     listener.handleContactDetailsUpdate(event);
 
@@ -95,7 +95,7 @@ class ContactDetailsListenerTest {
     ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
 
     Set<String> accountIds = Set.of(ACCOUNT_ID, "123");
-    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(accountIds);
+    when(service.getUserAccountIdsFromDatabase(TRAINEE_ID)).thenReturn(accountIds);
     when(service.deleteDuplicateAccounts(TRAINEE_ID, accountIds, EMAIL))
         .thenReturn(Optional.empty());
 
@@ -121,7 +121,7 @@ class ContactDetailsListenerTest {
     ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
 
     Set<String> accountIds = Set.of(ACCOUNT_ID, "123");
-    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(accountIds);
+    when(service.getUserAccountIdsFromDatabase(TRAINEE_ID)).thenReturn(accountIds);
     when(service.deleteDuplicateAccounts(TRAINEE_ID, accountIds, EMAIL))
         .thenReturn(Optional.of(ACCOUNT_ID));
 
@@ -145,7 +145,7 @@ class ContactDetailsListenerTest {
         }""".formatted(TRAINEE_ID, EMAIL, FORENAMES, SURNAME);
     ContactDetailsEvent event = mapper.readValue(eventJson, ContactDetailsEvent.class);
 
-    when(service.getUserAccountIds(TRAINEE_ID)).thenReturn(Set.of(ACCOUNT_ID));
+    when(service.getUserAccountIdsFromDatabase(TRAINEE_ID)).thenReturn(Set.of(ACCOUNT_ID));
 
     listener.handleContactDetailsUpdate(event);
 

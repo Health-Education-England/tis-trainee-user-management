@@ -89,6 +89,7 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
@@ -948,6 +949,46 @@ class UserAccountServiceTest {
     service.getUserAccountIds(TRAINEE_ID_2);
 
     verify(cognitoService, times(1)).listUsers(any());
+  }
+
+  @Test
+  void shouldGetUserAccountIdsFromDatabase() {
+    AccountDetails account1 = AccountDetails.builder()
+        .sub(USER_ID_1)
+        .email(EMAIL)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    AccountDetails account2 = AccountDetails.builder()
+        .sub(USER_ID_2)
+        .email("other@example.com")
+        .traineeId(TRAINEE_ID_1)
+        .build();
+
+    when(accountDetailsRepository.findByTraineeId(TRAINEE_ID_1))
+        .thenReturn(List.of(account1, account2));
+
+    Set<String> userAccountIds = service.getUserAccountIdsFromDatabase(TRAINEE_ID_1);
+
+    assertThat("Unexpected user IDs count.", userAccountIds.size(), is(2));
+    assertThat("Unexpected user IDs.", userAccountIds, hasItems(USER_ID_1, USER_ID_2));
+  }
+
+  @Test
+  void shouldGetEmptyUserAccountIdsFromDatabaseWhenAccountNotFound() {
+    when(accountDetailsRepository.findByTraineeId(TRAINEE_ID_1)).thenReturn(List.of());
+
+    Set<String> userAccountIds = service.getUserAccountIdsFromDatabase(TRAINEE_ID_1);
+
+    assertThat("Unexpected user IDs count.", userAccountIds.size(), is(0));
+  }
+
+  @Test
+  void shouldNotQueryCognitoWhenGettingUserAccountIdsFromDatabase() {
+    when(accountDetailsRepository.findByTraineeId(TRAINEE_ID_1)).thenReturn(List.of());
+
+    service.getUserAccountIdsFromDatabase(TRAINEE_ID_1);
+
+    verify(cognitoService, never()).listUsers(any());
   }
 
   @Test
