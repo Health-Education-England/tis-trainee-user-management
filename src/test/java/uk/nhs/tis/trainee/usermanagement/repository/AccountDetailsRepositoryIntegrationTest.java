@@ -22,20 +22,26 @@
 package uk.nhs.tis.trainee.usermanagement.repository;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.data.domain.Sort.Direction.ASC;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mongodb.client.FindIterable;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -55,6 +61,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import uk.nhs.tis.trainee.usermanagement.DockerImageNames;
 import uk.nhs.tis.trainee.usermanagement.config.MongoConfiguration;
 import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
+import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepositoryCustom.AccountDetailsUpsertRequest;
 
 @DataMongoTest
 @Import(MongoConfiguration.class)
@@ -75,99 +82,245 @@ class AccountDetailsRepositoryIntegrationTest {
   @Autowired
   private MongoTemplate template;
 
-  @ParameterizedTest
-  @CsvSource(delimiter = '|', textBlock = """
-      _id_       | _id
-      traineeId  | traineeId
-      """)
-  void shouldCreateSimpleIndexes(String indexName, String fieldName) {
-    IndexOperations indexOperations = template.indexOps(AccountDetails.class);
-    List<IndexInfo> indexes = indexOperations.getIndexInfo();
+  @Nested
+  class RepositoryConfiguration {
 
-    assertThat("Unexpected index count.", indexes, hasSize(4));
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        _id_       | _id
+        traineeId  | traineeId
+        """)
+    void shouldCreateSimpleIndexes(String indexName, String fieldName) {
+      IndexOperations indexOperations = template.indexOps(AccountDetails.class);
+      List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
-    IndexInfo index = indexes.stream()
-        .filter(i -> i.getName().equals(indexName))
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("Expected index not found."));
+      assertThat("Unexpected index count.", indexes, hasSize(4));
 
-    List<IndexField> indexFields = index.getIndexFields();
-    assertThat("Unexpected index field count.", indexFields, hasSize(1));
+      IndexInfo index = indexes.stream()
+          .filter(i -> i.getName().equals(indexName))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("Expected index not found."));
 
-    IndexField indexField = indexFields.get(0);
-    assertThat("Unexpected index field key.", indexField.getKey(), is(fieldName));
-    assertThat("Unexpected index field direction.", indexField.getDirection(), is(ASC));
+      List<IndexField> indexFields = index.getIndexFields();
+      assertThat("Unexpected index field count.", indexFields, hasSize(1));
 
-    assertThat("Unexpected hidden index.", index.isHidden(), is(false));
-    assertThat("Unexpected hashed index.", index.isHashed(), is(false));
-    assertThat("Unexpected sparse index.", index.isSparse(), is(false));
-    assertThat("Unexpected unique index.", index.isUnique(), is(false));
-    assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
+      IndexField indexField = indexFields.get(0);
+      assertThat("Unexpected index field key.", indexField.getKey(), is(fieldName));
+      assertThat("Unexpected index field direction.", indexField.getDirection(), is(ASC));
+
+      assertThat("Unexpected hidden index.", index.isHidden(), is(false));
+      assertThat("Unexpected hashed index.", index.isHashed(), is(false));
+      assertThat("Unexpected sparse index.", index.isSparse(), is(false));
+      assertThat("Unexpected unique index.", index.isUnique(), is(false));
+      assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        sub   | sub   | false
+        email | email | true
+        """)
+    void shouldCreateUniqueIndexes(String indexName, String fieldName, boolean sparse) {
+      IndexOperations indexOperations = template.indexOps(AccountDetails.class);
+      List<IndexInfo> indexes = indexOperations.getIndexInfo();
+
+      assertThat("Unexpected index count.", indexes, hasSize(4));
+
+      IndexInfo index = indexes.stream()
+          .filter(i -> i.getName().equals(indexName))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("Expected index not found."));
+
+      List<IndexField> indexFields = index.getIndexFields();
+      assertThat("Unexpected index field count.", indexFields, hasSize(1));
+
+      IndexField indexField = indexFields.get(0);
+      assertThat("Unexpected index field key.", indexField.getKey(), is(fieldName));
+      assertThat("Unexpected index field direction.", indexField.getDirection(), is(ASC));
+
+      assertThat("Unexpected hidden index.", index.isHidden(), is(false));
+      assertThat("Unexpected hashed index.", index.isHashed(), is(false));
+      assertThat("Unexpected sparse index.", index.isSparse(), is(sparse));
+      assertThat("Unexpected unique index.", index.isUnique(), is(true));
+      assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
+    }
+
+    @Test
+    void shouldStoreWithUuidIdType() throws JsonProcessingException {
+      AccountDetails account = AccountDetails.builder().build();
+      template.insert(account);
+
+      String document = template.execute(AccountDetails.class, collection -> {
+        FindIterable<Document> documents = collection.find();
+        return documents.cursor().next().toJson();
+      });
+
+      ObjectNode jsonDocument = (ObjectNode) new ObjectMapper().readTree(document);
+
+      String idType = jsonDocument.get("_id").get("$binary").get("subType").textValue();
+      assertThat("Unexpected ID format.", idType, is("04"));
+    }
+
+    @Test
+    void shouldPopulateLastModified() {
+      AccountDetails account = AccountDetails.builder()
+          .sub("test-sub")
+          .email("test@example.com")
+          .traineeId("test-trainee-id")
+          .build();
+      template.insert(account);
+
+      List<AccountDetails> savedRecords = template.find(new Query(), AccountDetails.class);
+      assertThat("Unexpected saved records.", savedRecords.size(), is(1));
+      AccountDetails savedRecord = savedRecords.get(0);
+      assertThat("Unexpected saved record id.", savedRecord.id(), notNullValue());
+      assertThat("Unexpected saved record lastModified timestamp.",
+          (double) Duration.between(savedRecord.lastModified(), Instant.now()).toSeconds(),
+          closeTo(0, 1));
+    }
   }
 
-  @ParameterizedTest
-  @CsvSource(delimiter = '|', textBlock = """
-      sub   | sub
-      email | email
-      """)
-  void shouldCreateUniqueIndexes(String indexName, String fieldName) {
-    IndexOperations indexOperations = template.indexOps(AccountDetails.class);
-    List<IndexInfo> indexes = indexOperations.getIndexInfo();
+  @Nested
+  class RepositoryCustomMethods {
 
-    assertThat("Unexpected index count.", indexes, hasSize(4));
+    private static final String SUB = UUID.randomUUID().toString();
+    private static final String EMAIL = "test@example.com";
+    private static final String TRAINEE_ID = UUID.randomUUID().toString();
 
-    IndexInfo index = indexes.stream()
-        .filter(i -> i.getName().equals(indexName))
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("Expected index not found."));
 
-    List<IndexField> indexFields = index.getIndexFields();
-    assertThat("Unexpected index field count.", indexFields, hasSize(1));
+    @Autowired
+    private AccountDetailsRepository repository;
 
-    IndexField indexField = indexFields.get(0);
-    assertThat("Unexpected index field key.", indexField.getKey(), is(fieldName));
-    assertThat("Unexpected index field direction.", indexField.getDirection(), is(ASC));
+    @Test
+    void shouldPopulateMetadataOnUpsertInsert() {
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
 
-    assertThat("Unexpected hidden index.", index.isHidden(), is(false));
-    assertThat("Unexpected hashed index.", index.isHashed(), is(false));
-    assertThat("Unexpected sparse index.", index.isSparse(), is(false));
-    assertThat("Unexpected unique index.", index.isUnique(), is(true));
-    assertThat("Unexpected wildcard index.", index.isWildcard(), is(false));
-  }
+      repository.upsertBySub(request);
 
-  @Test
-  void shouldStoreWithUuidIdType() throws JsonProcessingException {
-    AccountDetails account = AccountDetails.builder().build();
-    template.insert(account);
+      Optional<AccountDetails> accountDetails = repository.findBySub(SUB);
+      assertThat("Expected account details to be present.", accountDetails.isPresent(), is(true));
+      assertThat("Unexpected id.", accountDetails.get().id(), notNullValue());
+      assertThat("Unexpected lastModified.", accountDetails.get().lastModified(), notNullValue());
+    }
 
-    String document = template.execute(AccountDetails.class, collection -> {
-      FindIterable<Document> documents = collection.find();
-      return documents.cursor().next().toJson();
-    });
+    @Test
+    void shouldUpdateMetadataOnUpsertUpdate() {
+      AccountDetails inserted = template.insert(AccountDetails.builder()
+          .sub(SUB)
+          .build());
+      final UUID id = inserted.id();
+      final Instant lastModified = inserted.lastModified();
 
-    ObjectNode jsonDocument = (ObjectNode) new ObjectMapper().readTree(document);
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
 
-    String idType = jsonDocument.get("_id").get("$binary").get("subType").textValue();
-    assertThat("Unexpected ID format.", idType, is("04"));
-  }
+      repository.upsertBySub(request);
 
-  @Test
-  void shouldPopulateLastModified() {
-    AccountDetails account = AccountDetails.builder()
-        .sub("test-sub")
-        .email("test@example.com")
-        .traineeId("test-trainee-id")
-        .build();
-    template.insert(account);
+      Optional<AccountDetails> accountDetails = repository.findById(id);
+      assertThat("Expected account details to be present.", accountDetails.isPresent(), is(true));
+      assertThat("Unexpected id.", accountDetails.get().id(), is(id));
+      assertThat("lastModified should be updated.",
+          accountDetails.get().lastModified().isAfter(lastModified), is(true));
+    }
 
-    List<AccountDetails> savedRecords = template.find(new Query(), AccountDetails.class);
-    assertThat("Unexpected saved records.", savedRecords.size(), is(1));
-    AccountDetails savedRecord = savedRecords.get(0);
-    assertThat("Unexpected saved record id.", savedRecord.id(), notNullValue());
-    Instant roughlyNow = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-    Instant roughlyModified = savedRecord.lastModified().truncatedTo(ChronoUnit.SECONDS);
-    assertThat("Unexpected saved record lastModified timestamp.",
-        roughlyModified.equals(roughlyNow),
-        is(true));
+    @Test
+    void shouldNotUpdateLastModifiedWhenUnsettingStaleEmail() {
+      AccountDetails staleAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .email(EMAIL)
+          .traineeId(UUID.randomUUID().toString())
+          .build());
+      final UUID staleId = staleAccount.id();
+      final Instant staleLastModified = staleAccount.lastModified().truncatedTo(ChronoUnit.MILLIS);
+
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.upsertBySub(request);
+
+      Optional<AccountDetails> staleAccountDetails = repository.findById(staleId);
+      assertThat("Expected stale account details to still be present.",
+          staleAccountDetails.isPresent(), is(true));
+      assertThat("email should have been unset.", staleAccountDetails.get().email(),
+          is(nullValue()));
+      assertThat("lastModified should not be updated.",
+          staleAccountDetails.get().lastModified(), is(staleLastModified));
+    }
+
+    @Test
+    void shouldPopulateMetadataOnBulkUpsertInsert() {
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.bulkUpsertBySub(List.of(request));
+
+      Optional<AccountDetails> accountDetails = repository.findBySub(SUB);
+      assertThat("Expected account details to be present.", accountDetails.isPresent(), is(true));
+      assertThat("Unexpected id.", accountDetails.get().id(), notNullValue());
+      assertThat("Unexpected lastModified.", accountDetails.get().lastModified(), notNullValue());
+    }
+
+    @Test
+    void shouldUpdateMetadataOnBulkUpsertUpdate() {
+      AccountDetails inserted = template.insert(AccountDetails.builder()
+          .sub(SUB)
+          .build());
+      final UUID id = inserted.id();
+      final Instant lastModified = inserted.lastModified();
+
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.bulkUpsertBySub(List.of(request));
+
+      Optional<AccountDetails> accountDetails = repository.findById(id);
+      assertThat("Expected account details to be present.", accountDetails.isPresent(), is(true));
+      assertThat("Unexpected id.", accountDetails.get().id(), is(id));
+      assertThat("lastModified should be updated.",
+          accountDetails.get().lastModified().isAfter(lastModified), is(true));
+    }
+
+    @Test
+    void shouldNotUpdateLastModifiedWhenBulkUnsettingStaleEmail() {
+      AccountDetails staleAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .email(EMAIL)
+          .traineeId(UUID.randomUUID().toString())
+          .build());
+      final UUID staleId = staleAccount.id();
+      final Instant staleLastModified = staleAccount.lastModified().truncatedTo(ChronoUnit.MILLIS);
+
+      AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
+          .sub(SUB)
+          .email(EMAIL)
+          .traineeId(TRAINEE_ID)
+          .build();
+
+      repository.bulkUpsertBySub(List.of(request));
+
+      Optional<AccountDetails> staleAccountDetails = repository.findById(staleId);
+      assertThat("Expected stale account details to still be present.",
+          staleAccountDetails.isPresent(), is(true));
+      assertThat("email should have been unset.", staleAccountDetails.get().email(),
+          is(nullValue()));
+      assertThat("lastModified should not be updated.",
+          staleAccountDetails.get().lastModified(), is(staleLastModified));
+    }
   }
 }

@@ -153,7 +153,7 @@ public class CognitoService {
    * @return The user matching the username.
    * @throws UserNotFoundException If no users were found for the given username.
    */
-  private UserType getUser(String username) {
+  public UserType getUser(String username) {
     String attribute = username.contains("@") ? ATTRIBUTE_EMAIL : ATTRIBUTE_SUB;
     ListUsersRequest request = ListUsersRequest.builder()
         .userPoolId(userPoolId)
