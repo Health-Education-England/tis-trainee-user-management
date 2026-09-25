@@ -28,18 +28,13 @@ import com.mongodb.bulk.BulkWriteResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StopWatch;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminDeleteUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminListUserAuthEventsRequest;
@@ -62,6 +57,7 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepositoryCustom.AccountDetailsUpsertRequest;
@@ -74,8 +70,6 @@ import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
 @Service
 @XRayEnabled
 public class UserAccountService {
-
-  private static final String USER_ID_CACHE = "UserId";
 
   private static final String NO_ACCOUNT = "NO_ACCOUNT";
   private static final Integer MAX_LOGIN_EVENTS = 10;
@@ -90,7 +84,6 @@ public class UserAccountService {
 
   private final CognitoService cognitoService;
   private final String userPoolId;
-  private final Cache cache;
 
   private final AuditService auditService;
   private final EventPublishService eventPublishService;
@@ -98,17 +91,13 @@ public class UserAccountService {
   private final AccountDetailsRepository accountDetailsRepository;
   private final AccountEventMapper accountEventMapper;
 
-  private Instant lastUserCaching = null;
-
   UserAccountService(CognitoService cognitoService,
       @Value("${application.aws.cognito.user-pool-id}") String userPoolId,
-      CacheManager cacheManager, EventPublishService eventPublishService,
-      MetricsService metricsService, AuditService auditService,
-      AccountEventRepository accountEventRepository,
+      EventPublishService eventPublishService, MetricsService metricsService,
+      AuditService auditService, AccountEventRepository accountEventRepository,
       AccountDetailsRepository accountDetailsRepository, AccountEventMapper accountEventMapper) {
     this.cognitoService = cognitoService;
     this.userPoolId = userPoolId;
-    cache = cacheManager.getCache(USER_ID_CACHE);
     this.eventPublishService = eventPublishService;
     this.metricsService = metricsService;
     this.auditService = auditService;
@@ -440,81 +429,10 @@ public class UserAccountService {
    * @param personId The person ID to get the user IDs for.
    * @return The found user IDs, or empty if not found.
    */
-  @Cacheable(cacheNames = USER_ID_CACHE, unless = "#result.isEmpty()")
   public Set<String> getUserAccountIds(String personId) {
-    log.info("User account not found in the cache.");
-
-    // Skip caching if we already cached in the last fifteen minutes.
-    if (lastUserCaching == null || lastUserCaching.plus(Duration.ofMinutes(15))
-        .isBefore(Instant.now())) {
-      cacheAllUserAccountIds();
-      lastUserCaching = Instant.now();
-    }
-
-    Set<String> userAccountIds = cache.get(personId, Set.class);
-    return userAccountIds != null ? userAccountIds : Set.of();
-  }
-
-  /**
-   * Retrieve and cache a mapping of all person IDs to user IDs.
-   */
-  private void cacheAllUserAccountIds() {
-    log.info("Caching all user account ids from Cognito.");
-
-    StopWatch cacheTimer = new StopWatch();
-    cacheTimer.start();
-
-    String paginationToken = null;
-
-    do {
-      ListUsersRequest request = ListUsersRequest.builder()
-          .userPoolId(userPoolId)
-          .paginationToken(paginationToken)
-          .build();
-
-      try {
-        ListUsersResponse result = cognitoService.listUsers(request);
-        cacheUserAccountIds(result);
-        paginationToken = result.paginationToken();
-      } catch (TooManyRequestsException tmre) {
-        try {
-          // Cognito requests are limited to 5 per second.
-          log.warn("Cognito requests have exceed the limit.", tmre);
-          Thread.sleep(200);
-        } catch (InterruptedException ie) {
-          log.warn("Unable to sleep thread.", ie);
-          Thread.currentThread().interrupt();
-        }
-      }
-    } while (paginationToken != null);
-
-    cacheTimer.stop();
-    log.info("Total time taken to cache all user accounts was: {}s",
-        cacheTimer.getTotalTimeSeconds());
-  }
-
-  /**
-   * Cache the user accounts ids for the given result.
-   *
-   * @param result The result of a ListUsersRequest.
-   */
-  private void cacheUserAccountIds(ListUsersResponse result) {
-    result.users().stream()
-        .map(UserType::attributes)
-        .map(attributes -> attributes.stream()
-            .collect(Collectors.toMap(AttributeType::name, AttributeType::value))
-        )
-        .forEach(attr -> {
-          String tisId = attr.get(ATTRIBUTE_TIS_ID);
-          Set<String> ids = cache.get(tisId, Set.class);
-
-          if (ids == null) {
-            ids = new HashSet<>();
-          }
-
-          ids.add(attr.get(ATTRIBUTE_SUB));
-          cache.put(tisId, ids);
-        });
+    return accountDetailsRepository.findAllByTraineeId(personId).stream()
+        .map(AccountDetails::sub)
+        .collect(Collectors.toSet());
   }
 
   /**
