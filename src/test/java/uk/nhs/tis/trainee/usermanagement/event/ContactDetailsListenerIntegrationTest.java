@@ -29,23 +29,17 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.Mockito.when;
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.SQS;
 
-import com.redis.testcontainers.RedisContainer;
 import io.awspring.cloud.sns.core.SnsTemplate;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -60,6 +54,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
 import uk.nhs.tis.trainee.usermanagement.DockerImageNames;
 import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent.AccountEventDetail;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent.EmailUpdatedDetail;
@@ -87,9 +82,6 @@ class ContactDetailsListenerIntegrationTest {
       DockerImageNames.LOCALSTACK)
       .withServices(SQS);
 
-  @Container
-  private static final RedisContainer redisContainer = new RedisContainer(DockerImageNames.REDIS);
-
   @DynamicPropertySource
   private static void overrideProperties(DynamicPropertyRegistry registry) {
     registry.add("application.aws.sqs.contact-details.updated", () -> CONTACT_DETAILS_QUEUE);
@@ -100,18 +92,12 @@ class ContactDetailsListenerIntegrationTest {
     registry.add("spring.cloud.aws.sqs.endpoint",
         () -> localstack.getEndpointOverride(SQS).toString());
     registry.add("spring.cloud.aws.sqs.enabled", () -> true);
-
-    registry.add("spring.data.redis.host", redisContainer::getHost);
-    registry.add("spring.data.redis.port", () -> redisContainer.getMappedPort(6379));
   }
 
   @BeforeAll
   static void setUpBeforeAll() throws IOException, InterruptedException {
     localstack.execInContainer("awslocal sqs create-queue --queue-name", CONTACT_DETAILS_QUEUE);
   }
-
-  @Autowired
-  private CacheManager cacheManager;
 
   @Autowired
   private MongoTemplate mongoTemplate;
@@ -125,15 +111,6 @@ class ContactDetailsListenerIntegrationTest {
   @MockitoBean
   private SnsTemplate snsTemplate;
 
-  private Cache cache;
-
-  @BeforeEach
-  void setUp() {
-    cache = cacheManager.getCache("UserId");
-    Objects.requireNonNull(cache);
-    cache.clear();
-  }
-
   @AfterEach
   void cleanUp() {
     mongoTemplate.findAllAndRemove(new Query(), AccountEvent.class);
@@ -141,7 +118,11 @@ class ContactDetailsListenerIntegrationTest {
 
   @Test
   void shouldStoreAccountEventWhenContactDetailsUpdated() {
-    cache.put(TRAINEE_ID, Set.of(USER_ID));
+    mongoTemplate.save(AccountDetails.builder()
+        .sub(USER_ID)
+        .traineeId(TRAINEE_ID)
+        .email(USER_EMAIL_OLD)
+        .build());
 
     UserAccountDetailsDto oldDetails = UserAccountDetailsDto.builder()
         .id(USER_ID)

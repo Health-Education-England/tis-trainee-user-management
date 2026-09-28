@@ -29,7 +29,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.redis.testcontainers.RedisContainer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -45,8 +44,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.MongoDBContainer;
@@ -82,15 +79,6 @@ class AccountDetailsResourceIntegrationTest {
   @ServiceConnection
   private static final MongoDBContainer mongoDBContainer = new MongoDBContainer(
       DockerImageNames.MONGO);
-
-  @Container
-  private static final RedisContainer redisContainer = new RedisContainer(DockerImageNames.REDIS);
-
-  @DynamicPropertySource
-  private static void overrideProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.data.redis.host", redisContainer::getHost);
-    registry.add("spring.data.redis.port", () -> redisContainer.getMappedPort(6379));
-  }
 
   @Autowired
   private MockMvc mockMvc;

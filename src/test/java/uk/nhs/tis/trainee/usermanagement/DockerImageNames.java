@@ -30,5 +30,4 @@ public class DockerImageNames {
 
   public static final DockerImageName LOCALSTACK = DockerImageName.parse("localstack/localstack:3");
   public static final DockerImageName MONGO = DockerImageName.parse("mongo:5");
-  public static final DockerImageName REDIS = DockerImageName.parse("redis:6");
 }

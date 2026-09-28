@@ -26,6 +26,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.closeTo;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,7 +46,6 @@ import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.SOFTWARE_TOK
 import com.mongodb.bulk.BulkWriteResult;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -59,8 +59,6 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminAddUserToGroupResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminDeleteUserRequest;
@@ -89,6 +87,7 @@ import uk.nhs.tis.trainee.usermanagement.dto.UserAccountDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.dto.UserLoginDetailsDto;
 import uk.nhs.tis.trainee.usermanagement.enumeration.MfaType;
 import uk.nhs.tis.trainee.usermanagement.mapper.AccountEventMapper;
+import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEvent;
 import uk.nhs.tis.trainee.usermanagement.model.AccountEventType;
 import uk.nhs.tis.trainee.usermanagement.repository.AccountDetailsRepository;
@@ -121,7 +120,6 @@ class UserAccountServiceTest {
 
   private UserAccountService service;
   private CognitoService cognitoService;
-  private Cache cache;
   private AuditService auditService;
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
@@ -132,11 +130,6 @@ class UserAccountServiceTest {
   @BeforeEach
   void setUp() {
     cognitoService = mock(CognitoService.class);
-    cache = mock(Cache.class);
-
-    CacheManager cacheManager = mock(CacheManager.class);
-    when(cacheManager.getCache("UserId")).thenReturn(cache);
-
     auditService = mock(AuditService.class);
     eventPublishService = mock(EventPublishService.class);
     metricsService = mock(MetricsService.class);
@@ -144,9 +137,9 @@ class UserAccountServiceTest {
     accountEventRepository = mock(AccountEventRepository.class);
     accountEventMapper = mock(AccountEventMapper.class);
 
-    service = spy(new UserAccountService(cognitoService, USER_POOL_ID, cacheManager,
-        eventPublishService, metricsService, auditService, accountEventRepository,
-        accountDetailsRepository, accountEventMapper));
+    service = spy(new UserAccountService(cognitoService, USER_POOL_ID, eventPublishService,
+        metricsService, auditService, accountEventRepository, accountDetailsRepository,
+        accountEventMapper));
   }
 
   @Test
@@ -762,192 +755,24 @@ class UserAccountServiceTest {
   }
 
   @Test
-  void shouldRequestUserAccountIdsFromGivenUserPoolWhenGettingUserAccountIds() {
-    ListUsersResponse result = ListUsersResponse.builder()
-        .users(List.of())
-        .build();
-
-    ArgumentCaptor<ListUsersRequest> requestCaptor = ArgumentCaptor.captor();
-    when(cognitoService.listUsers(requestCaptor.capture())).thenReturn(result);
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-
-    ListUsersRequest request = requestCaptor.getValue();
-    assertThat("Unexpected request user pool.", request.userPoolId(), is(USER_POOL_ID));
-  }
-
-  @Test
-  void shouldCacheAllUserAccountIdsWhenGettingUserAccountIds() {
-    UserType user1 = UserType.builder()
-        .attributes(
-            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build(),
-            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build()
-        )
-        .build();
-    UserType user2 = UserType.builder()
-        .attributes(
-            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build(),
-            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build()
-        )
-        .build();
-
-    ListUsersResponse result = ListUsersResponse.builder()
-        .users(List.of(user1, user2))
-        .build();
-
-    when(cognitoService.listUsers(any())).thenReturn(result);
-
-    when(cache.get(any())).thenReturn(null);
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-
-    verify(cache).put(TRAINEE_ID_1, Set.of(USER_ID_1));
-    verify(cache).put(TRAINEE_ID_2, Set.of(USER_ID_2));
-  }
-
-  @Test
-  void shouldPaginateThroughAllUserAccountIdsWhenGettingUserAccountIds() {
-    ListUsersResponse result1 = ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build(),
-                AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build())
-            .build())
-        .paginationToken("tokenforpage2")
-        .build();
-
-    ListUsersResponse result2 = ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build(),
-                AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build())
-            .build())
-        .build();
-
-    ArgumentCaptor<ListUsersRequest> requestCaptor = ArgumentCaptor.captor();
-    when(cognitoService.listUsers(requestCaptor.capture())).thenReturn(result1, result2);
-
-    when(cache.get(any())).thenReturn(null);
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-
-    verify(cache).put(TRAINEE_ID_1, Set.of(USER_ID_1));
-    verify(cache).put(TRAINEE_ID_2, Set.of(USER_ID_2));
-
-    List<ListUsersRequest> requests = requestCaptor.getAllValues();
-    assertThat("Unexpected request count.", requests.size(), is(2));
-    ListUsersRequest request1 = requests.get(0);
-    assertThat("Unexpected pagination token.", request1.paginationToken(), nullValue());
-    ListUsersRequest request2 = requests.get(1);
-    assertThat("Unexpected pagination token.", request2.paginationToken(), is("tokenforpage2"));
-  }
-
-  @Test
-  void shouldRetryPaginatingThroughAllUserAccountIdsWhenRateLimitedGettingUserAccountIds() {
-    ListUsersResponse result1 = ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build(),
-                AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build())
-            .build())
-        .paginationToken("tokenforpage2")
-        .build();
-
-    ListUsersResponse result2 = ListUsersResponse.builder()
-        .users(UserType.builder()
-            .attributes(
-                AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build(),
-                AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build())
-            .build())
-        .build();
-
-    ArgumentCaptor<ListUsersRequest> requestCaptor = ArgumentCaptor.captor();
-    when(cognitoService.listUsers(requestCaptor.capture()))
-        .thenReturn(result1)
-        .thenThrow(TooManyRequestsException.class)
-        .thenReturn(result2);
-
-    when(cache.get(any())).thenReturn(null);
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-
-    verify(cache).put(TRAINEE_ID_1, Set.of(USER_ID_1));
-    verify(cache).put(TRAINEE_ID_2, Set.of(USER_ID_2));
-
-    List<ListUsersRequest> requests = requestCaptor.getAllValues();
-    assertThat("Unexpected request count.", requests.size(), is(3));
-    ListUsersRequest request1 = requests.get(0);
-    assertThat("Unexpected pagination token.", request1.paginationToken(), nullValue());
-    ListUsersRequest request2 = requests.get(1);
-    assertThat("Unexpected pagination token.", request2.paginationToken(), is("tokenforpage2"));
-    ListUsersRequest request3 = requests.get(2);
-    assertThat("Unexpected pagination token.", request3.paginationToken(), is("tokenforpage2"));
-  }
-
-  @Test
-  void shouldCacheDuplicateUserAccountIdsWhenGettingUserAccountIds() {
-    UserType user = UserType.builder()
-        .attributes(
-            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build(),
-            AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build())
-        .build();
-
-    ListUsersResponse result = ListUsersResponse.builder()
-        .users(List.of(user))
-        .build();
-
-    when(cognitoService.listUsers(any())).thenReturn(result);
-
-    when(cache.get(TRAINEE_ID_1, Set.class)).thenReturn(new HashSet<>(Set.of(USER_ID_1)));
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-
-    verify(cache).put(TRAINEE_ID_1, Set.of(USER_ID_1, USER_ID_2));
-  }
-
-  @Test
-  void shouldGetUserAccountIdsFromCache() {
-    ListUsersResponse result = ListUsersResponse.builder()
-        .users(List.of())
-        .build();
-
-    when(cognitoService.listUsers(any())).thenReturn(result);
-
-    when(cache.get(TRAINEE_ID_1, Set.class)).thenReturn(Set.of(USER_ID_1, USER_ID_2));
+  void shouldGetUserAccountIdsWhenAccountsFound() {
+    when(accountDetailsRepository.findAllByTraineeId(TRAINEE_ID_1)).thenReturn(Set.of(
+        AccountDetails.builder().sub(USER_ID_1).build(),
+        AccountDetails.builder().sub(USER_ID_2).build()
+    ));
 
     Set<String> userAccountIds = service.getUserAccountIds(TRAINEE_ID_1);
 
-    assertThat("Unexpected user IDs count.", userAccountIds.size(), is(2));
-    assertThat("Unexpected user IDs.", userAccountIds, hasItems(USER_ID_1, USER_ID_2));
+    assertThat("Unexpected user IDs.", userAccountIds, containsInAnyOrder(USER_ID_1, USER_ID_2));
   }
 
   @Test
-  void shouldGetEmptyUserAccountIdsWhenAccountNotFoundAfterBuildingCache() {
-    ListUsersResponse result = ListUsersResponse.builder()
-        .users(List.of())
-        .build();
-
-    when(cognitoService.listUsers(any())).thenReturn(result);
-
-    when(cache.get(TRAINEE_ID_1, Set.class)).thenReturn(null);
+  void shouldGetEmptyUserAccountIdsWhenAccountsNotFound() {
+    when(accountDetailsRepository.findAllByTraineeId(TRAINEE_ID_1)).thenReturn(Set.of());
 
     Set<String> userAccountIds = service.getUserAccountIds(TRAINEE_ID_1);
 
     assertThat("Unexpected user IDs count.", userAccountIds.size(), is(0));
-  }
-
-  @Test
-  void shouldNotImmediatelyRepeatBuildingUserIdCache() {
-    ListUsersResponse result = ListUsersResponse.builder()
-        .users(List.of())
-        .build();
-
-    when(cognitoService.listUsers(any())).thenReturn(result);
-
-    service.getUserAccountIds(TRAINEE_ID_1);
-    service.getUserAccountIds(TRAINEE_ID_2);
-
-    verify(cognitoService, times(1)).listUsers(any());
   }
 
   @Test

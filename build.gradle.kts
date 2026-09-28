@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "2.9.1"
+version = "2.10.0"
 
 configurations {
   compileOnly {
@@ -29,7 +29,6 @@ dependencies {
   // Spring Boot starters
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
-  implementation("org.springframework.boot:spring-boot-starter-data-redis")
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-security")
 
@@ -69,7 +68,6 @@ dependencies {
   testImplementation("org.testcontainers:junit-jupiter")
   testImplementation("org.testcontainers:localstack")
   testImplementation("org.testcontainers:mongodb")
-  testImplementation("com.redis:testcontainers-redis")
 }
 
 java {
