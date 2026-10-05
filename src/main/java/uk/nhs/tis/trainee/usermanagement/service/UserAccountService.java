@@ -513,7 +513,10 @@ public class UserAccountService {
     switch (eventName) {
       case "AdminDeleteUser", "DeleteUser" -> {
         log.info("Deleting account details for user '{}'.", sub);
+        Optional<AccountDetails> existingAccount = accountDetailsRepository.findBySub(sub);
         accountDetailsRepository.deleteBySub(sub);
+        existingAccount.ifPresent(
+          account -> eventPublishService.publishAccountDeleteEvent(account.id()));
       }
       case "AdminCreateUser", "SignUp", "AdminUpdateUserAttributes", "UpdateUserAttributes" -> {
         UserAccountDetailsDto userDetails = cognitoService.getUserDetails(sub, false, false);
@@ -524,6 +527,9 @@ public class UserAccountService {
             .email(email)
             .traineeId(traineeId)
             .build());
+        accountDetailsRepository.findBySub(sub).ifPresent(account ->
+            eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
+                account.email(), account.traineeId()));
       }
       default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
     }
