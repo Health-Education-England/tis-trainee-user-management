@@ -22,6 +22,7 @@
 package uk.nhs.tis.trainee.usermanagement.repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -64,4 +65,12 @@ public interface AccountDetailsRepository extends MongoRepository<AccountDetails
    * @return The number of account details deleted.
    */
   long deleteByLastModifiedBefore(Instant timestamp);
+
+  /**
+   * Find all account details with lastModified timestamp later than startDate.
+   *
+   * @param startDate The timestamp to compare with lastModified.
+   * @return The account details, if found.
+   */
+  List<AccountDetails> findAllByLastModifiedGreaterThanEqual(Instant startDate);
 }

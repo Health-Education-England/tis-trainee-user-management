@@ -534,4 +534,28 @@ public class UserAccountService {
       default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
     }
   }
+
+  /**
+   * Publish the current state of all known accounts to the SNS topic, so the downstream services
+   * can refresh their account data.
+   *
+   * @param startDate The earliest lastModified timestamp include in the refresh job;
+   *                  if null then refresh all account
+   */
+  public void publishAccountRefresh(Instant startDate) {
+    log.info("Publish account refresh with startDate '{}'.", startDate);
+
+    List<AccountDetails> accountDetails = List.of();
+    if (startDate == null) {
+      accountDetails = accountDetailsRepository.findAll();
+    } else {
+      accountDetails = accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate);
+    }
+
+    accountDetails.forEach(account ->
+        eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
+            account.email(), account.traineeId()));
+
+    log.info("Publish account refresh completed. {} accounts published.", accountDetails.size());
+  }
 }
