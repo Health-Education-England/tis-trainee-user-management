@@ -25,8 +25,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
+
+import java.time.Instant;
 
 /**
  * REST controller for managing account details.
@@ -52,6 +55,17 @@ public class AccountDetailsResource {
   ResponseEntity<Void> reconcileAccountDetails() {
     log.info("Received request to reconcile account details");
     service.reconcileAccountDetails();
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Publish the current state of all known accounts to the SNS topic, so the downstream services
+   * can refresh their account data.
+   */
+  @PostMapping("/jobs/publish-refresh")
+  ResponseEntity<Void> publishAccountRefresh(@RequestParam(required = false) Instant startDate) {
+    log.info("Received request to publish account refresh with startDate {}", startDate);
+    service.publishAccountRefresh(startDate);
     return ResponseEntity.noContent().build();
   }
 }
