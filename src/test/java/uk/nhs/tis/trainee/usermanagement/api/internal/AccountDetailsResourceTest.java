@@ -32,6 +32,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 
+import java.time.Instant;
+
 public class AccountDetailsResourceTest {
 
   private AccountDetailsResource controller;
@@ -49,5 +51,22 @@ public class AccountDetailsResourceTest {
 
     assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     verify(service).reconcileAccountDetails();
+  }
+
+  @Test
+  void shouldPublishAccountRefresh() {
+    ResponseEntity<Void> response = controller.publishAccountRefresh(null);
+
+    assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(service).publishAccountRefresh(null);
+  }
+
+  @Test
+  void shouldPublishAccountRefreshWithStartDate() {
+    Instant startDate = Instant.now();
+    ResponseEntity<Void> response = controller.publishAccountRefresh(startDate);
+
+    assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(service).publishAccountRefresh(startDate);
   }
 }
