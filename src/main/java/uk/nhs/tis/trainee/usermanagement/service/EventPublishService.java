@@ -69,8 +69,8 @@ public class EventPublishService {
       @Value("${application.aws.sqs.request}") String requestQueueUrl,
       MetricsService metricsService) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
-    this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
     this.accountEventTopicArn = accountEventTopicArn;
+    this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
     this.profileMoveTopicArn = profileMoveTopicArn;
     this.queueMessagingTemplate = queueMessagingTemplate;
     this.queueUrl = requestQueueUrl;

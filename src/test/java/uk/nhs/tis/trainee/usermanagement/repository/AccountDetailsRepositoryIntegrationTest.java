@@ -53,7 +53,9 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexField;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -321,6 +323,28 @@ class AccountDetailsRepositoryIntegrationTest {
           is(nullValue()));
       assertThat("lastModified should not be updated.",
           staleAccountDetails.get().lastModified(), is(staleLastModified));
+    }
+
+    @Test
+    void shouldFindAccountsOnlyModifiedOnOrAfterProvidedStartDate() {
+      Instant now = Instant.now();
+      Instant startDate = now.minus(Duration.ofMinutes(5));
+      Instant beforeStartDate = now.minus(Duration.ofMinutes(10));
+
+      AccountDetails staleAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .build());
+      template.updateFirst(Query.query(Criteria.where("sub").is(staleAccount.sub())),
+          Update.update("lastModified", beforeStartDate), AccountDetails.class);
+
+      AccountDetails recentAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .build());
+
+      List<AccountDetails> found = repository.findAllByLastModifiedGreaterThanEqual(startDate);
+
+      assertThat("Unexpected account count.", found, hasSize(1));
+      assertThat("Unexpected account id.", found.get(0).id(), is(recentAccount.id()));
     }
   }
 }
