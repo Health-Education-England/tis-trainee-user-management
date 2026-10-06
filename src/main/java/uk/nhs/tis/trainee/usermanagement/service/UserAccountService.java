@@ -516,7 +516,7 @@ public class UserAccountService {
         Optional<AccountDetails> existingAccount = accountDetailsRepository.findBySub(sub);
         accountDetailsRepository.deleteBySub(sub);
         existingAccount.ifPresent(
-          account -> eventPublishService.publishAccountDeleteEvent(account.id()));
+            account -> eventPublishService.publishAccountDeleteEvent(account.id()));
       }
       case "AdminCreateUser", "SignUp", "AdminUpdateUserAttributes", "UpdateUserAttributes" -> {
         UserAccountDetailsDto userDetails = cognitoService.getUserDetails(sub, false, false);
@@ -545,7 +545,7 @@ public class UserAccountService {
   public void publishAccountRefresh(Instant startDate) {
     log.info("Publish account refresh with startDate '{}'.", startDate);
 
-    List<AccountDetails> accountDetails = List.of();
+    List<AccountDetails> accountDetails;
     if (startDate == null) {
       accountDetails = accountDetailsRepository.findAll();
     } else {

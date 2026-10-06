@@ -26,13 +26,12 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
-
-import java.time.Instant;
 
 public class AccountDetailsResourceTest {
 
