@@ -88,8 +88,8 @@ class EventPublishServiceTest {
     assertThat("Unexpected headers size.", headers.size(), is(3));
     assertThat("Unexpected headers.", headers.keySet(),
         hasItems("id", "timestamp", "message-group-id"));
-    String expectedMessageGroupId = String.format("%s_%s_%s", EventPublishService.REQUEST_SCHEMA,
-        EventPublishService.REQUEST_TABLE, TRAINEE_ID);
+    String expectedMessageGroupId = EventPublishService.REQUEST_SCHEMA + "_"
+        + EventPublishService.REQUEST_TABLE + "_" + TRAINEE_ID;
     assertThat("Unexpected header.", headers.get("message-group-id"), is(expectedMessageGroupId));
     verify(metricsService).incrementResyncCounter();
   }
@@ -143,7 +143,7 @@ class EventPublishServiceTest {
     assertThat("Unexpected subject.", headers.get(NOTIFICATION_SUBJECT_HEADER),
         is("Profile Data Move"));
     assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
-        is(String.format("%s_%s", fromTisId, toTisId)));
+        is(fromTisId + "_" + toTisId));
     assertThat("Unexpected producer.", headers.get("producer"), is("tis-trainee-user-management"));
     verifyNoInteractions(metricsService);
   }
