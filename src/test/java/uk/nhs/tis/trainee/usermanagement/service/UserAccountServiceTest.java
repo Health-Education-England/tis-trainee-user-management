@@ -1110,7 +1110,6 @@ class UserAccountServiceTest {
   void shouldPublishAndUpsertWhenCreateOrUpdateEvent(String apiName) {
     String newEmail = "email@email.com";
     AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
-    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
 
     UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
         .id(USER_ID_1)
@@ -1137,6 +1136,7 @@ class UserAccountServiceTest {
         .build();
     when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
 
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
     service.updateAccountDetails(event);
 
     InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
@@ -1148,14 +1148,14 @@ class UserAccountServiceTest {
         .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2);
   }
 
-  @Test
-  void shouldStillPublishTargetAccountWhenEmailIsNull() {
+  @ParameterizedTest
+  @NullAndEmptySource
+  void shouldUpsertAndStillPublishTargetAccountWhenEmailIsNullOrEmpty(String email) {
     AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
-    CognitoEventDto event = new CognitoEventDto("SignUp", Instant.now(), additionalEventData);
 
     UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
         .id(USER_ID_1)
-        .email(null)
+        .email(email)
         .traineeId(TRAINEE_ID_2)
         .build();
     when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
@@ -1164,15 +1164,20 @@ class UserAccountServiceTest {
     AccountDetails upsertedAccount = AccountDetails.builder()
         .id(accountId)
         .sub(USER_ID_1)
+        .email(email)
         .traineeId(TRAINEE_ID_2)
         .build();
     when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
 
+    CognitoEventDto event = new CognitoEventDto("SignUp", Instant.now(), additionalEventData);
     service.updateAccountDetails(event);
 
     verify(accountDetailsRepository, never()).findByEmailAndSubNot(any(), any());
+    verify(accountDetailsRepository).upsertBySub(any(AccountDetailsUpsertRequest.class));
+    verify(eventPublishService, times(1))
+        .publishAccountUpdateEvent(any(), any(), any(), any());
     verify(eventPublishService)
-        .publishAccountUpdateEvent(accountId, USER_ID_1, null, TRAINEE_ID_2);
+        .publishAccountUpdateEvent(accountId, USER_ID_1, email, TRAINEE_ID_2);
   }
 
   @Test
