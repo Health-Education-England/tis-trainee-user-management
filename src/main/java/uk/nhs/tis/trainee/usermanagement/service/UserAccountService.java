@@ -34,7 +34,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -526,10 +525,13 @@ public class UserAccountService {
         String email = userDetails.getEmail();
         String traineeId = userDetails.getTraineeId();
 
-        if (email != null) {
-          for (AccountDetails displaced : accountDetailsRepository.findByEmailAndSubNot(email, sub)) {
-            eventPublishService.publishAccountUpdateEvent(displaced.id(), displaced.sub(),
-                null, displaced.traineeId());
+        // handle affected account from email update
+        // unset email of stale account if email is the same (email should be unique)
+        if (email != null && !email.isEmpty()) {
+          for (AccountDetails staledAccount : accountDetailsRepository.findByEmailAndSubNot(
+              email, sub)) {
+            eventPublishService.publishAccountUpdateEvent(staledAccount.id(), staledAccount.sub(),
+                null, staledAccount.traineeId());
           }
         }
 
