@@ -19,46 +19,18 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package uk.nhs.tis.trainee.usermanagement.model;
+package uk.nhs.tis.trainee.usermanagement.event;
 
-import java.time.Instant;
 import java.util.UUID;
-import lombok.Builder;
-import lombok.With;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 /**
- * Represents a user account, with associated user and trainee IDs.
+ * An event to be published when an account is created or updated.
  *
- * @param id           The unique identifier of the account.
- * @param sub          The subject identifier of the user associated with the account.
- * @param email        The email address of the user associated with the account.
- * @param traineeId    The ID of the trainee associated with the user account.
- * @param lastModified The timestamp of the last modification to the account.
+ * @param id        The ID of the account.
+ * @param sub       The sub of the account.
+ * @param email     The registered email of the account.
+ * @param traineeId The id of the trainee.
  */
-@Document("AccountDetails")
-@Builder
-public record AccountDetails(
-    @Id
-    @With
-    UUID id,
-
-    @Indexed(unique = true)
-    String sub,
-
-    @Indexed(unique = true, sparse = true)
-    @With
-    String email,
-
-    @Indexed
-    @With
-    String traineeId,
-
-    @Indexed
-    @LastModifiedDate
-    Instant lastModified) implements UuidIdentifiedEntity {
+public record AccountUpdateEvent(UUID id, String sub, String email, String traineeId) {
 
 }

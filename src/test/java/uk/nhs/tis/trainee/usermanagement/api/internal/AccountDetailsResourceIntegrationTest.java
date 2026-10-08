@@ -25,6 +25,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -160,5 +163,57 @@ class AccountDetailsResourceIntegrationTest {
 
     assertThat("Expected orphaned account to be deleted.",
         accountDetailsRepository.findBySub(ORPHAN_SUB).isPresent(), is(false));
+  }
+
+  @Test
+  void shouldPublishRefreshForAllAccounts() throws Exception {
+    AccountDetails account1 = mongoTemplate.insert(AccountDetails.builder()
+        .sub(EXISTING_SUB)
+        .email(EXISTING_EMAIL)
+        .traineeId(EXISTING_TRAINEE_ID)
+        .build());
+    AccountDetails account2 = mongoTemplate.insert(AccountDetails.builder()
+        .sub(NEW_SUB)
+        .email(NEW_EMAIL)
+        .traineeId(NEW_TRAINEE_ID)
+        .build());
+
+    mockMvc.perform(post("/api/internal/account-details/jobs/publish-refresh"))
+        .andExpect(status().isNoContent());
+
+    verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
+        account1.email(), account1.traineeId());
+    verify(eventPublishService).publishAccountUpdateEvent(account2.id(), account2.sub(),
+        account2.email(), account2.traineeId());
+  }
+
+  @Test
+  void shouldPublishRefreshForAllAccountsWithStartDate()
+      throws Exception {
+    Instant startDate = Instant.now().minus(Duration.ofMinutes(1));
+    Instant beforeStartDate = startDate.minus(Duration.ofMinutes(10));
+
+    AccountDetails staleAccount = mongoTemplate.insert(AccountDetails.builder()
+        .sub(ORPHAN_SUB)
+        .email(ORPHAN_EMAIL)
+        .traineeId(ORPHAN_TRAINEE_ID)
+        .build());
+    mongoTemplate.updateFirst(Query.query(Criteria.where("sub").is(ORPHAN_SUB)),
+        new Update().set("lastModified", beforeStartDate), AccountDetails.class);
+
+    AccountDetails recentAccount = mongoTemplate.insert(AccountDetails.builder()
+        .sub(NEW_SUB)
+        .email(NEW_EMAIL)
+        .traineeId(NEW_TRAINEE_ID)
+        .build());
+
+    mockMvc.perform(post("/api/internal/account-details/jobs/publish-refresh")
+            .param("startDate", startDate.toString()))
+        .andExpect(status().isNoContent());
+
+    verify(eventPublishService, never()).publishAccountUpdateEvent(eq(staleAccount.id()), any(),
+        any(), any());
+    verify(eventPublishService).publishAccountUpdateEvent(recentAccount.id(), recentAccount.sub(),
+        recentAccount.email(), recentAccount.traineeId());
   }
 }

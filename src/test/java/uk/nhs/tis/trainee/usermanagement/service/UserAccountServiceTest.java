@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,6 +52,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -980,6 +982,49 @@ class UserAccountServiceTest {
     service.updateAccountDetails(event);
 
     verify(accountDetailsRepository).deleteBySub(USER_ID_1);
+    verify(eventPublishService, never()).publishAccountDeleteEvent(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminDeleteUser", "DeleteUser"})
+  void shouldPublishAccountDeleteEventWhenAccountDeleted(String apiName) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    UUID accountId = UUID.randomUUID();
+    AccountDetails existingAccount = AccountDetails.builder()
+        .id(accountId)
+        .sub(USER_ID_1)
+        .email(EMAIL)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(existingAccount));
+
+    service.updateAccountDetails(event);
+
+    InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
+    inOrder.verify(eventPublishService).publishAccountDeleteEvent(accountId);
+    inOrder.verify(accountDetailsRepository).deleteBySub(USER_ID_1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminDeleteUser", "DeleteUser"})
+  void shouldNotDeleteAccountWhenPublishDeleteEventFails(String apiName) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    UUID accountId = UUID.randomUUID();
+    AccountDetails existingAccount = AccountDetails.builder()
+        .id(accountId)
+        .sub(USER_ID_1)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(existingAccount));
+    doThrow(new RuntimeException("publish error")).when(eventPublishService)
+        .publishAccountDeleteEvent(accountId);
+
+    assertThrows(RuntimeException.class, () -> service.updateAccountDetails(event));
+
+    verify(accountDetailsRepository, never()).deleteBySub(any());
   }
 
   @ParameterizedTest
@@ -993,7 +1038,11 @@ class UserAccountServiceTest {
         UserNotFoundException.class);
 
     assertThrows(UserNotFoundException.class, () -> service.updateAccountDetails(event));
+
     verify(accountDetailsRepository, never()).deleteBySub(any());
+    verify(accountDetailsRepository, never()).findByEmailAndSubNot(any(), any());
+    verify(accountDetailsRepository, never()).upsertBySub(any());
+    verify(eventPublishService, never()).publishAccountUpdateEvent(any(), any(), any(), any());
   }
 
   @ParameterizedTest
@@ -1020,6 +1069,115 @@ class UserAccountServiceTest {
     assertThat("Unexpected sub.", upsertRequest.sub(), is(USER_ID_1));
     assertThat("Unexpected email.", upsertRequest.email(), is("new@example.com"));
     assertThat("Unexpected trainee ID.", upsertRequest.traineeId(), is(TRAINEE_ID_2));
+    verify(eventPublishService, never()).publishAccountUpdateEvent(any(), any(), any(), any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
+      "UpdateUserAttributes"})
+  void shouldPublishAccountUpdateEventForCreateOrUpdateEvent(String apiName) {
+    String newEmail = "email@email.com";
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
+
+    UUID accountId = UUID.randomUUID();
+    AccountDetails upsertedAccount = AccountDetails.builder()
+        .id(accountId)
+        .sub(USER_ID_1)
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
+
+    service.updateAccountDetails(event);
+
+    InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
+    inOrder.verify(accountDetailsRepository).upsertBySub(any());
+    inOrder.verify(eventPublishService)
+        .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminCreateUser", "SignUp", "AdminUpdateUserAttributes",
+      "UpdateUserAttributes"})
+  void shouldPublishAndUpsertWhenCreateOrUpdateEvent(String apiName) {
+    String newEmail = "email@email.com";
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
+
+    AccountDetails staledAccount = AccountDetails.builder()
+        .id(UUID.randomUUID())
+        .sub("old-sub")
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    when(accountDetailsRepository.findByEmailAndSubNot(newEmail, USER_ID_1))
+        .thenReturn(List.of(staledAccount));
+
+    UUID accountId = UUID.randomUUID();
+    AccountDetails upsertedAccount = AccountDetails.builder()
+        .id(accountId)
+        .sub(USER_ID_1)
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
+
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+    service.updateAccountDetails(event);
+
+    InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
+    inOrder.verify(eventPublishService)
+        .publishAccountUpdateEvent(staledAccount.id(), staledAccount.sub(), null,
+            staledAccount.traineeId());
+    inOrder.verify(accountDetailsRepository).upsertBySub(any());
+    inOrder.verify(eventPublishService)
+        .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2);
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  void shouldUpsertAndStillPublishTargetAccountWhenEmailIsNullOrEmpty(String email) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(email)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
+
+    UUID accountId = UUID.randomUUID();
+    AccountDetails upsertedAccount = AccountDetails.builder()
+        .id(accountId)
+        .sub(USER_ID_1)
+        .email(email)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
+
+    CognitoEventDto event = new CognitoEventDto("SignUp", Instant.now(), additionalEventData);
+    service.updateAccountDetails(event);
+
+    verify(accountDetailsRepository, never()).findByEmailAndSubNot(any(), any());
+    verify(accountDetailsRepository).upsertBySub(any(AccountDetailsUpsertRequest.class));
+    verify(eventPublishService, times(1))
+        .publishAccountUpdateEvent(any(), any(), any(), any());
+    verify(eventPublishService)
+        .publishAccountUpdateEvent(accountId, USER_ID_1, email, TRAINEE_ID_2);
   }
 
   @Test
@@ -1036,5 +1194,58 @@ class UserAccountServiceTest {
     service.updateAccountDetails(event);
 
     verify(accountDetailsRepository, never()).upsertBySub(any());
+  }
+
+  @Test
+  void shouldPublishUpdateEventForAllAccountsWhenRefreshWithoutStartDate() {
+    AccountDetails account1 = AccountDetails.builder()
+        .id(UUID.randomUUID())
+        .sub(USER_ID_1)
+        .email(EMAIL)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    AccountDetails account2 = AccountDetails.builder()
+        .id(UUID.randomUUID())
+        .sub(USER_ID_2)
+        .email("other@example.com")
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(accountDetailsRepository.findAllBy()).thenReturn(Stream.of(account1, account2));
+
+    service.publishAccountRefresh(null);
+
+    verify(accountDetailsRepository, never()).findAllByLastModifiedGreaterThanEqual(any());
+    verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
+        account1.email(), account1.traineeId());
+    verify(eventPublishService).publishAccountUpdateEvent(account2.id(), account2.sub(),
+        account2.email(), account2.traineeId());
+  }
+
+  @Test
+  void shouldPublishUpdateEventForAccountsModifiedSinceStartDateWhenRefresh() {
+    Instant startDate = Instant.now().minus(Duration.ofDays(1));
+    AccountDetails account1 = AccountDetails.builder()
+        .id(UUID.randomUUID())
+        .sub(USER_ID_1)
+        .email(EMAIL)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+    when(accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate)).thenReturn(
+        Stream.of(account1));
+
+    service.publishAccountRefresh(startDate);
+
+    verify(accountDetailsRepository, never()).findAll();
+    verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
+        account1.email(), account1.traineeId());
+  }
+
+  @Test
+  void shouldNotPublishAnyEventsWhenNoAccountsFoundForRefresh() {
+    when(accountDetailsRepository.findAll()).thenReturn(List.of());
+
+    service.publishAccountRefresh(null);
+
+    verify(eventPublishService, never()).publishAccountUpdateEvent(any(), any(), any(), any());
   }
 }

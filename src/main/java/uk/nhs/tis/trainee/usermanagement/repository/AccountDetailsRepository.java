@@ -22,9 +22,11 @@
 package uk.nhs.tis.trainee.usermanagement.repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 
@@ -35,12 +37,28 @@ public interface AccountDetailsRepository extends MongoRepository<AccountDetails
     AccountDetailsRepositoryCustom {
 
   /**
+   * Find all account details.
+   *
+   * @return A stream of account details for the given trainee ID.
+   */
+  Stream<AccountDetails> findAllBy();
+
+  /**
    * Find all account details for a given trainee ID.
    *
    * @param traineeId The trainee ID to find account details for.
    * @return A set of account details for the given trainee ID.
    */
   Set<AccountDetails> findAllByTraineeId(String traineeId);
+
+  /**
+   * Find account details for a given email but not the same sub.
+   *
+   * @param email The email of the account to find.
+   * @param sub The sub of the account to filter out.
+   * @return The account details, if found.
+   */
+  List<AccountDetails> findByEmailAndSubNot(String email, String sub);
 
   /**
    * Find account details for a given sub.
@@ -64,4 +82,12 @@ public interface AccountDetailsRepository extends MongoRepository<AccountDetails
    * @return The number of account details deleted.
    */
   long deleteByLastModifiedBefore(Instant timestamp);
+
+  /**
+   * Find all account details with lastModified timestamp later than startDate.
+   *
+   * @param startDate The timestamp to compare with lastModified.
+   * @return The account details, if found.
+   */
+  Stream<AccountDetails> findAllByLastModifiedGreaterThanEqual(Instant startDate);
 }

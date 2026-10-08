@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -49,5 +50,22 @@ public class AccountDetailsResourceTest {
 
     assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     verify(service).reconcileAccountDetails();
+  }
+
+  @Test
+  void shouldPublishAccountRefresh() {
+    ResponseEntity<Void> response = controller.publishAccountRefresh(null);
+
+    assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(service).publishAccountRefresh(null);
+  }
+
+  @Test
+  void shouldPublishAccountRefreshWithStartDate() {
+    Instant startDate = Instant.now();
+    ResponseEntity<Void> response = controller.publishAccountRefresh(startDate);
+
+    assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(service).publishAccountRefresh(startDate);
   }
 }

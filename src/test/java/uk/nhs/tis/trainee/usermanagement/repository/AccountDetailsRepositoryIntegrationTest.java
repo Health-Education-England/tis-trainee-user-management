@@ -39,6 +39,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -53,7 +54,9 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexField;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -94,7 +97,7 @@ class AccountDetailsRepositoryIntegrationTest {
       IndexOperations indexOperations = template.indexOps(AccountDetails.class);
       List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
-      assertThat("Unexpected index count.", indexes, hasSize(4));
+      assertThat("Unexpected index count.", indexes, hasSize(5));
 
       IndexInfo index = indexes.stream()
           .filter(i -> i.getName().equals(indexName))
@@ -124,7 +127,7 @@ class AccountDetailsRepositoryIntegrationTest {
       IndexOperations indexOperations = template.indexOps(AccountDetails.class);
       List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
-      assertThat("Unexpected index count.", indexes, hasSize(4));
+      assertThat("Unexpected index count.", indexes, hasSize(5));
 
       IndexInfo index = indexes.stream()
           .filter(i -> i.getName().equals(indexName))
@@ -213,7 +216,11 @@ class AccountDetailsRepositoryIntegrationTest {
           .sub(SUB)
           .build());
       final UUID id = inserted.id();
-      final Instant lastModified = inserted.lastModified();
+
+      final Instant lastModified = Instant.now().minus(Duration.ofMinutes(1))
+          .truncatedTo(ChronoUnit.MILLIS);
+      template.updateFirst(Query.query(Criteria.where("sub").is(SUB)),
+          Update.update("lastModified", lastModified), AccountDetails.class);
 
       AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
           .sub(SUB)
@@ -321,6 +328,31 @@ class AccountDetailsRepositoryIntegrationTest {
           is(nullValue()));
       assertThat("lastModified should not be updated.",
           staleAccountDetails.get().lastModified(), is(staleLastModified));
+    }
+
+    @Test
+    void shouldFindAccountsOnlyModifiedOnOrAfterProvidedStartDate() {
+      Instant now = Instant.now();
+      Instant startDate = now.minus(Duration.ofMinutes(5));
+      Instant beforeStartDate = now.minus(Duration.ofMinutes(10));
+
+      AccountDetails staleAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .build());
+      template.updateFirst(Query.query(Criteria.where("sub").is(staleAccount.sub())),
+          Update.update("lastModified", beforeStartDate), AccountDetails.class);
+
+      AccountDetails recentAccount = template.insert(AccountDetails.builder()
+          .sub(UUID.randomUUID().toString())
+          .build());
+
+
+      Stream<AccountDetails> stream = repository.findAllByLastModifiedGreaterThanEqual(startDate);
+      List<AccountDetails> found = stream.toList();
+
+
+      assertThat("Unexpected account count.", found, hasSize(1));
+      assertThat("Unexpected account id.", found.get(0).id(), is(recentAccount.id()));
     }
   }
 }
