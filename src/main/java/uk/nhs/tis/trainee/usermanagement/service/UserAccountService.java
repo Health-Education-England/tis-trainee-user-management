@@ -28,10 +28,13 @@ import com.mongodb.bulk.BulkWriteResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -513,20 +516,29 @@ public class UserAccountService {
     switch (eventName) {
       case "AdminDeleteUser", "DeleteUser" -> {
         log.info("Deleting account details for user '{}'.", sub);
-        Optional<AccountDetails> existingAccount = accountDetailsRepository.findBySub(sub);
+        accountDetailsRepository.findBySub(sub).ifPresent(account -> {
+          eventPublishService.publishAccountDeleteEvent(account.id());
+        });
         accountDetailsRepository.deleteBySub(sub);
-        existingAccount.ifPresent(
-            account -> eventPublishService.publishAccountDeleteEvent(account.id()));
       }
       case "AdminCreateUser", "SignUp", "AdminUpdateUserAttributes", "UpdateUserAttributes" -> {
         UserAccountDetailsDto userDetails = cognitoService.getUserDetails(sub, false, false);
         String email = userDetails.getEmail();
         String traineeId = userDetails.getTraineeId();
+
+        if (email != null) {
+          for (AccountDetails displaced : accountDetailsRepository.findByEmailAndSubNot(email, sub)) {
+            eventPublishService.publishAccountUpdateEvent(displaced.id(), displaced.sub(),
+                null, displaced.traineeId());
+          }
+        }
+
         accountDetailsRepository.upsertBySub(AccountDetailsUpsertRequest.builder()
             .sub(sub)
             .email(email)
             .traineeId(traineeId)
             .build());
+
         accountDetailsRepository.findBySub(sub).ifPresent(account ->
             eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
                 account.email(), account.traineeId()));
@@ -545,17 +557,20 @@ public class UserAccountService {
   public void publishAccountRefresh(Instant startDate) {
     log.info("Publish account refresh with startDate '{}'.", startDate);
 
-    List<AccountDetails> accountDetails;
-    if (startDate == null) {
-      accountDetails = accountDetailsRepository.findAll();
-    } else {
-      accountDetails = accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate);
+    long published = 0;
+    try (Stream<AccountDetails> accounts = startDate == null
+        ? accountDetailsRepository.findAllBy()
+        : accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate)) {
+
+      Iterator<AccountDetails> it = accounts.iterator();
+      while (it.hasNext()) {
+        AccountDetails account = it.next();
+        eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
+            account.email(), account.traineeId());
+        published++;
+      }
     }
 
-    accountDetails.forEach(account ->
-        eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
-            account.email(), account.traineeId()));
-
-    log.info("Publish account refresh completed. {} accounts published.", accountDetails.size());
+    log.info("Publish account refresh completed. {} accounts published.", published);
   }
 }

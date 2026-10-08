@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,6 +52,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1001,8 +1004,28 @@ class UserAccountServiceTest {
     service.updateAccountDetails(event);
 
     InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
-    inOrder.verify(accountDetailsRepository).deleteBySub(USER_ID_1);
     inOrder.verify(eventPublishService).publishAccountDeleteEvent(accountId);
+    inOrder.verify(accountDetailsRepository).deleteBySub(USER_ID_1);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"AdminDeleteUser", "DeleteUser"})
+  void shouldNotDeleteAccountWhenPublishDeleteEventFails(String apiName) {
+    AdditionalEventData additionalEventData = new AdditionalEventData(USER_ID_1);
+    CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
+
+    UUID accountId = UUID.randomUUID();
+    AccountDetails existingAccount = AccountDetails.builder()
+        .id(accountId)
+        .sub(USER_ID_1)
+        .build();
+    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(existingAccount));
+    doThrow(new RuntimeException("publish error")).when(eventPublishService)
+        .publishAccountDeleteEvent(accountId);
+
+    assertThrows(RuntimeException.class, () -> service.updateAccountDetails(event));
+
+    verify(accountDetailsRepository, never()).deleteBySub(any());
   }
 
   @ParameterizedTest
@@ -1108,7 +1131,7 @@ class UserAccountServiceTest {
         .email("other@example.com")
         .traineeId(TRAINEE_ID_2)
         .build();
-    when(accountDetailsRepository.findAll()).thenReturn(List.of(account1, account2));
+    when(accountDetailsRepository.findAllBy()).thenReturn(Stream.of(account1, account2));
 
     service.publishAccountRefresh(null);
 
@@ -1129,7 +1152,7 @@ class UserAccountServiceTest {
         .traineeId(TRAINEE_ID_1)
         .build();
     when(accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate)).thenReturn(
-        List.of(account1));
+        Stream.of(account1));
 
     service.publishAccountRefresh(startDate);
 

@@ -57,6 +57,7 @@ public record AccountDetails(
     @With
     String traineeId,
 
+    @Indexed
     @LastModifiedDate
     Instant lastModified) implements UuidIdentifiedEntity {
 

@@ -39,6 +39,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
+
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -96,7 +98,7 @@ class AccountDetailsRepositoryIntegrationTest {
       IndexOperations indexOperations = template.indexOps(AccountDetails.class);
       List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
-      assertThat("Unexpected index count.", indexes, hasSize(4));
+      assertThat("Unexpected index count.", indexes, hasSize(5));
 
       IndexInfo index = indexes.stream()
           .filter(i -> i.getName().equals(indexName))
@@ -126,7 +128,7 @@ class AccountDetailsRepositoryIntegrationTest {
       IndexOperations indexOperations = template.indexOps(AccountDetails.class);
       List<IndexInfo> indexes = indexOperations.getIndexInfo();
 
-      assertThat("Unexpected index count.", indexes, hasSize(4));
+      assertThat("Unexpected index count.", indexes, hasSize(5));
 
       IndexInfo index = indexes.stream()
           .filter(i -> i.getName().equals(indexName))
@@ -215,7 +217,11 @@ class AccountDetailsRepositoryIntegrationTest {
           .sub(SUB)
           .build());
       final UUID id = inserted.id();
-      final Instant lastModified = inserted.lastModified();
+
+      final Instant lastModified = Instant.now().minus(Duration.ofMinutes(1))
+          .truncatedTo(ChronoUnit.MILLIS);
+      template.updateFirst(Query.query(Criteria.where("sub").is(SUB)),
+          Update.update("lastModified", lastModified), AccountDetails.class);
 
       AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
           .sub(SUB)
@@ -341,7 +347,10 @@ class AccountDetailsRepositoryIntegrationTest {
           .sub(UUID.randomUUID().toString())
           .build());
 
-      List<AccountDetails> found = repository.findAllByLastModifiedGreaterThanEqual(startDate);
+
+      Stream<AccountDetails> stream = repository.findAllByLastModifiedGreaterThanEqual(startDate);
+      List<AccountDetails> found = stream.toList();
+
 
       assertThat("Unexpected account count.", found, hasSize(1));
       assertThat("Unexpected account id.", found.get(0).id(), is(recentAccount.id()));
