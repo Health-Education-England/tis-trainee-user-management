@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
-
 import org.springframework.data.mongodb.repository.MongoRepository;
 import uk.nhs.tis.trainee.usermanagement.model.AccountDetails;
 
