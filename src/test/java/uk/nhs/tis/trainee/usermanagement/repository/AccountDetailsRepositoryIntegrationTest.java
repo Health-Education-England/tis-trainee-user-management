@@ -238,14 +238,18 @@ class AccountDetailsRepositoryIntegrationTest {
     }
 
     @Test
-    void shouldNotUpdateLastModifiedWhenUnsettingStaleEmail() {
+    void shouldUpdateLastModifiedWhenUnsettingStaleEmail() {
       AccountDetails staleAccount = template.insert(AccountDetails.builder()
           .sub(UUID.randomUUID().toString())
           .email(EMAIL)
           .traineeId(UUID.randomUUID().toString())
           .build());
       final UUID staleId = staleAccount.id();
-      final Instant staleLastModified = staleAccount.lastModified().truncatedTo(ChronoUnit.MILLIS);
+
+      final Instant past = Instant.now().minus(Duration.ofMinutes(1))
+          .truncatedTo(ChronoUnit.MILLIS);
+      template.updateFirst(Query.query(Criteria.where("_id").is(staleId)),
+          Update.update("lastModified", past), AccountDetails.class);
 
       AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
           .sub(SUB)
@@ -260,8 +264,8 @@ class AccountDetailsRepositoryIntegrationTest {
           staleAccountDetails.isPresent(), is(true));
       assertThat("email should have been unset.", staleAccountDetails.get().email(),
           is(nullValue()));
-      assertThat("lastModified should not be updated.",
-          staleAccountDetails.get().lastModified(), is(staleLastModified));
+      assertThat("lastModified should be updated.",
+          staleAccountDetails.get().lastModified().isAfter(past), is(true));
     }
 
     @Test

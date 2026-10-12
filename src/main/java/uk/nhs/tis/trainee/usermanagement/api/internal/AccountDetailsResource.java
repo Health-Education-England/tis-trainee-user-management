@@ -60,11 +60,14 @@ public class AccountDetailsResource {
   /**
    * Publish the current state of all known accounts to the SNS topic, so the downstream services
    * can refresh their account data.
+   *
+   * @param since The earliest lastModified timestamp include in the refresh job;
+   *              if null then refresh all account
    */
   @PostMapping("/jobs/publish-refresh")
-  ResponseEntity<Void> publishAccountRefresh(@RequestParam(required = false) Instant startDate) {
-    log.info("Received request to publish account refresh with startDate {}", startDate);
-    service.publishAccountRefresh(startDate);
+  ResponseEntity<Void> publishAccountRefresh(@RequestParam(required = false) Instant since) {
+    log.info("Received request to publish account refresh with startDate {}", since);
+    service.publishAccountRefresh(since);
     return ResponseEntity.noContent().build();
   }
 }

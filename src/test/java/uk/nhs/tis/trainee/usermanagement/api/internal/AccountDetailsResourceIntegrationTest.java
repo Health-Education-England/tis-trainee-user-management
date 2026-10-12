@@ -192,28 +192,25 @@ class AccountDetailsResourceIntegrationTest {
       throws Exception {
     Instant startDate = Instant.now().minus(Duration.ofMinutes(1));
     Instant beforeStartDate = startDate.minus(Duration.ofMinutes(10));
+    Instant afterStartDate = startDate.plus(Duration.ofMinutes(1));
 
     AccountDetails staleAccount = mongoTemplate.insert(AccountDetails.builder()
-        .sub(ORPHAN_SUB)
-        .email(ORPHAN_EMAIL)
-        .traineeId(ORPHAN_TRAINEE_ID)
-        .build());
+        .sub(ORPHAN_SUB).email(ORPHAN_EMAIL).traineeId(ORPHAN_TRAINEE_ID).build());
     mongoTemplate.updateFirst(Query.query(Criteria.where("sub").is(ORPHAN_SUB)),
         new Update().set("lastModified", beforeStartDate), AccountDetails.class);
 
     AccountDetails recentAccount = mongoTemplate.insert(AccountDetails.builder()
-        .sub(NEW_SUB)
-        .email(NEW_EMAIL)
-        .traineeId(NEW_TRAINEE_ID)
-        .build());
+        .sub(NEW_SUB).email(NEW_EMAIL).traineeId(NEW_TRAINEE_ID).build());
+    mongoTemplate.updateFirst(Query.query(Criteria.where("sub").is(NEW_SUB)),
+        new Update().set("lastModified", afterStartDate), AccountDetails.class);
 
     mockMvc.perform(post("/api/internal/account-details/jobs/publish-refresh")
-            .param("startDate", startDate.toString()))
+            .param("since", startDate.toString()))
         .andExpect(status().isNoContent());
 
-    verify(eventPublishService, never()).publishAccountUpdateEvent(eq(staleAccount.id()), any(),
-        any(), any());
-    verify(eventPublishService).publishAccountUpdateEvent(recentAccount.id(), recentAccount.sub(),
-        recentAccount.email(), recentAccount.traineeId());
+    verify(eventPublishService, never())
+        .publishAccountUpdateEvent(eq(staleAccount.id()), any(), any(), any());
+    verify(eventPublishService).publishAccountUpdateEvent(recentAccount.id(),
+        recentAccount.sub(), recentAccount.email(), recentAccount.traineeId());
   }
 }

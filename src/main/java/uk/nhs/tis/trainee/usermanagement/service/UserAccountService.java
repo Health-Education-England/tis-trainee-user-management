@@ -572,15 +572,15 @@ public class UserAccountService {
           }
         }
 
-        accountDetailsRepository.upsertBySub(AccountDetailsUpsertRequest.builder()
-            .sub(sub)
-            .email(email)
-            .traineeId(traineeId)
-            .build());
+        AccountDetails account = accountDetailsRepository.upsertBySub(
+            AccountDetailsUpsertRequest.builder()
+                .sub(sub)
+                .email(email)
+                .traineeId(traineeId)
+                .build());
 
-        accountDetailsRepository.findBySub(sub).ifPresent(account ->
-            eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
-                account.email(), account.traineeId()));
+        eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
+            account.email(), account.traineeId());
       }
       default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
     }
@@ -590,16 +590,16 @@ public class UserAccountService {
    * Publish the current state of all known accounts to the SNS topic, so the downstream services
    * can refresh their account data.
    *
-   * @param startDate The earliest lastModified timestamp include in the refresh job;
+   * @param since The earliest lastModified timestamp include in the refresh job;
    *                  if null then refresh all account
    */
-  public void publishAccountRefresh(Instant startDate) {
-    log.info("Publish account refresh with startDate '{}'.", startDate);
+  public void publishAccountRefresh(Instant since) {
+    log.info("Publish account refresh with startDate '{}'.", since);
 
     long published = 0;
-    try (Stream<AccountDetails> accounts = startDate == null
+    try (Stream<AccountDetails> accounts = since == null
         ? accountDetailsRepository.findAllBy()
-        : accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate)) {
+        : accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(since)) {
 
       Iterator<AccountDetails> it = accounts.iterator();
       while (it.hasNext()) {

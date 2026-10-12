@@ -1111,7 +1111,17 @@ class UserAccountServiceTest {
         .build();
     when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
 
+    AccountDetails upsertedAccount = AccountDetails.builder()
+        .id(UUID.randomUUID())
+        .sub(USER_ID_1)
+        .email(newEmail)
+        .traineeId(TRAINEE_ID_2)
+        .build();
+    when(accountDetailsRepository.upsertBySub(any())).thenReturn(upsertedAccount);
+
     service.updateAccountDetails(event);
+
+    verify(accountDetailsRepository).findByEmailAndSubNot(newEmail, USER_ID_1);
 
     ArgumentCaptor<AccountDetailsUpsertRequest> upsertCaptor = ArgumentCaptor.captor();
     verify(accountDetailsRepository).upsertBySub(upsertCaptor.capture());
@@ -1120,7 +1130,6 @@ class UserAccountServiceTest {
     assertThat("Unexpected sub.", upsertRequest.sub(), is(USER_ID_1));
     assertThat("Unexpected email.", upsertRequest.email(), is("new@example.com"));
     assertThat("Unexpected trainee ID.", upsertRequest.traineeId(), is(TRAINEE_ID_2));
-    verify(eventPublishService, never()).publishAccountUpdateEvent(any(), any(), any(), any());
   }
 
   @ParameterizedTest
@@ -1145,7 +1154,7 @@ class UserAccountServiceTest {
         .email(newEmail)
         .traineeId(TRAINEE_ID_2)
         .build();
-    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
+    when(accountDetailsRepository.upsertBySub(any())).thenReturn(upsertedAccount);
 
     service.updateAccountDetails(event);
 
@@ -1185,7 +1194,7 @@ class UserAccountServiceTest {
         .email(newEmail)
         .traineeId(TRAINEE_ID_2)
         .build();
-    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
+    when(accountDetailsRepository.upsertBySub(any())).thenReturn(upsertedAccount);
 
     CognitoEventDto event = new CognitoEventDto(apiName, Instant.now(), additionalEventData);
     service.updateAccountDetails(event);
@@ -1218,7 +1227,7 @@ class UserAccountServiceTest {
         .email(email)
         .traineeId(TRAINEE_ID_2)
         .build();
-    when(accountDetailsRepository.findBySub(USER_ID_1)).thenReturn(Optional.of(upsertedAccount));
+    when(accountDetailsRepository.upsertBySub(any())).thenReturn(upsertedAccount);
 
     CognitoEventDto event = new CognitoEventDto("SignUp", Instant.now(), additionalEventData);
     service.updateAccountDetails(event);

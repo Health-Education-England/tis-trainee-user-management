@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.mongodb.core.BulkOperations;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -58,20 +59,21 @@ public class AccountDetailsRepositoryImpl implements AccountDetailsRepositoryCus
   }
 
   @Override
-  public void upsertBySub(AccountDetailsUpsertRequest upsertRequest) {
+  public AccountDetails upsertBySub(AccountDetailsUpsertRequest upsertRequest) {
     String email = upsertRequest.email();
 
     if (email != null && !email.isEmpty()) {
       // Unset any stale email assignment that would break the unique constraint.
       mongoOperations.updateMulti(Query.query(Criteria
               .where(EMAIL_FIELD).is(email)
-              .and(SUB_FIELD).ne(upsertRequest.sub())
-          ),
-          new Update().unset(EMAIL_FIELD), AccountDetails.class);
+              .and(SUB_FIELD).ne(upsertRequest.sub())),
+          new Update().unset(EMAIL_FIELD).set(LAST_MODIFIED_FIELD, Instant.now()),
+          AccountDetails.class);
     }
 
     Query query = Query.query(Criteria.where(SUB_FIELD).is(upsertRequest.sub()));
-    mongoOperations.upsert(query, buildUpsertUpdate(upsertRequest), AccountDetails.class);
+    return mongoOperations.findAndModify(query, buildUpsertUpdate(upsertRequest),
+        FindAndModifyOptions.options().upsert(true).returnNew(true), AccountDetails.class);
   }
 
   @Override

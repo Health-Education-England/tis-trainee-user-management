@@ -62,10 +62,10 @@ public class AccountDetailsResourceTest {
 
   @Test
   void shouldPublishAccountRefreshWithStartDate() {
-    Instant startDate = Instant.now();
-    ResponseEntity<Void> response = controller.publishAccountRefresh(startDate);
+    Instant since = Instant.now();
+    ResponseEntity<Void> response = controller.publishAccountRefresh(since);
 
     assertThat("Unexpected response.", response.getStatusCode(), is(HttpStatus.NO_CONTENT));
-    verify(service).publishAccountRefresh(startDate);
+    verify(service).publishAccountRefresh(since);
   }
 }
