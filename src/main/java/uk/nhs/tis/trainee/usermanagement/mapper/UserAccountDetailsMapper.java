@@ -47,6 +47,8 @@ public interface UserAccountDetailsMapper {
    */
   @Mapping(target = "id", expression = "java(getId(user.attributes()))")
   @Mapping(target = "email", expression = "java(getEmail(user.attributes()))")
+  @Mapping(target = "forenames", expression = "java(getForenames(user.attributes()))")
+  @Mapping(target = "surname", expression = "java(getSurname(user.attributes()))")
   @Mapping(target = "mfaStatus", expression = "java(getCustomMfaType(user.attributes()))")
   @Mapping(target = "userStatus", expression = "java(user.userStatusAsString())")
   @Mapping(target = "groups", source = "groups")
@@ -63,6 +65,8 @@ public interface UserAccountDetailsMapper {
    */
   @Mapping(target = "id", expression = "java(getId(result.userAttributes()))")
   @Mapping(target = "email", expression = "java(getEmail(result.userAttributes()))")
+  @Mapping(target = "forenames", expression = "java(getForenames(result.userAttributes()))")
+  @Mapping(target = "surname", expression = "java(getSurname(result.userAttributes()))")
   @Mapping(target = "mfaStatus",
       expression = "java(MfaType.fromAdminGetUserResult(result).toString())")
   @Mapping(target = "userStatus", expression = "java(result.userStatusAsString())")
@@ -90,6 +94,26 @@ public interface UserAccountDetailsMapper {
    */
   default String getEmail(List<AttributeType> attributes) {
     return getAttribute("email", attributes);
+  }
+
+  /**
+   * Get the forenames from the user attributes.
+   *
+   * @param attributes The attribute list.
+   * @return The attribute value, or null if not found in the list.
+   */
+  default String getForenames(List<AttributeType> attributes) {
+    return getAttribute("given_name", attributes);
+  }
+
+  /**
+   * Get the surname from the user attributes.
+   *
+   * @param attributes The attribute list.
+   * @return The attribute value, or null if not found in the list.
+   */
+  default String getSurname(List<AttributeType> attributes) {
+    return getAttribute("family_name", attributes);
   }
 
   /**

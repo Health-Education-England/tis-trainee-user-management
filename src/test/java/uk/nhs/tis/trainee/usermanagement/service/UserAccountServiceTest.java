@@ -204,6 +204,23 @@ class UserAccountServiceTest {
   }
 
   @Test
+  void shouldNotUpdateAttributesWhenEmailAndNamesHaveNotChanged() {
+    String email = "unchanged.email@example.com";
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .forenames(FORENAMES_1)
+        .surname(SURNAME_1)
+        .build();
+
+    when(cognitoService.getUserDetails(any())).thenReturn(userDetails);
+
+    service.updateContactDetails(USER_ID_1, email, FORENAMES_1, SURNAME_1);
+
+    verify(cognitoService, never()).updateAttributes(any(), any());
+  }
+
+  @Test
   void shouldUpdateEmailAndNamesWhenNewEmailNotExistsInUserPool() {
     String newEmail = "new.email@example.com";
 
@@ -239,6 +256,40 @@ class UserAccountServiceTest {
     assertThat("Unexpected attribute value.", userAttribute.value(), is(newEmail));
 
     userAttribute = userAttributes.get(3);
+    assertThat("Unexpected attribute name.", userAttribute.name(), is(ATTRIBUTE_EMAIL_VERIFIED));
+    assertThat("Unexpected attribute value.", userAttribute.value(), is("true"));
+  }
+
+  @Test
+  void shouldUpdateEmailWhenNamesHaveNotChanged() {
+    String previousEmail = "previous.email@example.com";
+    String newEmail = "new.email@example.com";
+
+    UserAccountDetailsDto userDetails = UserAccountDetailsDto.builder()
+        .id(USER_ID_1)
+        .email(previousEmail)
+        .forenames(FORENAMES_1)
+        .surname(SURNAME_1)
+        .traineeId(TRAINEE_ID_1)
+        .build();
+
+    when(cognitoService.getUserDetails(any()))
+        .thenThrow(UserNotFoundException.class)
+        .thenReturn(userDetails);
+
+    service.updateContactDetails(USER_ID_1, newEmail, FORENAMES_1, SURNAME_1);
+
+    ArgumentCaptor<List<AttributeType>> attributesCaptor = ArgumentCaptor.captor();
+    verify(cognitoService).updateAttributes(eq(USER_ID_1), attributesCaptor.capture());
+
+    List<AttributeType> userAttributes = attributesCaptor.getValue();
+    assertThat("Unexpected attribute count.", userAttributes.size(), is(2));
+
+    AttributeType userAttribute = userAttributes.get(0);
+    assertThat("Unexpected attribute name.", userAttribute.name(), is(ATTRIBUTE_EMAIL));
+    assertThat("Unexpected attribute value.", userAttribute.value(), is(newEmail));
+
+    userAttribute = userAttributes.get(1);
     assertThat("Unexpected attribute name.", userAttribute.name(), is(ATTRIBUTE_EMAIL_VERIFIED));
     assertThat("Unexpected attribute value.", userAttribute.value(), is("true"));
   }

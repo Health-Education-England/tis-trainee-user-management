@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -76,6 +77,8 @@ public class UserAccountService {
 
   private static final String ATTRIBUTE_EMAIL = "email";
   private static final String ATTRIBUTE_EMAIL_VERIFIED = "email_verified";
+  private static final String ATTRIBUTE_FAMILY_NAME = "family_name";
+  private static final String ATTRIBUTE_GIVEN_NAME = "given_name";
   private static final String ATTRIBUTE_MFA_TYPE = "custom:mfaType";
   private static final String ATTRIBUTE_SUB = "sub";
   private static final String ATTRIBUTE_TIS_ID = "custom:tisId";
@@ -141,10 +144,6 @@ public class UserAccountService {
       String surname) {
     log.info("Updating email to '{}' for user '{}'.", newEmail, userId);
 
-    List<AttributeType> attributeTypes = new ArrayList<>();
-    attributeTypes.add(AttributeType.builder().name("family_name").value(surname).build());
-    attributeTypes.add(AttributeType.builder().name("given_name").value(forenames).build());
-
     try {
       // Verify that the new email is not already used.
       UserAccountDetailsDto existingUser = cognitoService.getUserDetails(newEmail);
@@ -152,7 +151,15 @@ public class UserAccountService {
 
       if (existingUserId.equals(userId)) {
         log.info("The email for this user has not changed, skipping email update.");
-        cognitoService.updateAttributes(userId, attributeTypes);
+        List<AttributeType> attributeTypes = getModifiedAttributes(existingUser, forenames,
+            surname);
+
+        if (attributeTypes.isEmpty()) {
+          log.info("The attributes for user '{}' have not changed, skipping attribute update.",
+              userId);
+        } else {
+          cognitoService.updateAttributes(userId, attributeTypes);
+        }
       } else {
         String message = String.format("The email '%s' is already in use by user '%s'.", newEmail,
             existingUserId);
@@ -160,8 +167,7 @@ public class UserAccountService {
       }
     } catch (UserNotFoundException e) {
       UserAccountDetailsDto existingUser = getUserAccountDetails(userId);
-      String traineeId = existingUser.getTraineeId();
-      String existingEmail = existingUser.getEmail();
+      List<AttributeType> attributeTypes = getModifiedAttributes(existingUser, forenames, surname);
 
       // If an existing user was not found then the new email address can be used.
       attributeTypes.add(AttributeType.builder().name(ATTRIBUTE_EMAIL).value(newEmail).build());
@@ -169,10 +175,41 @@ public class UserAccountService {
           AttributeType.builder().name(ATTRIBUTE_EMAIL_VERIFIED).value("true").build());
       cognitoService.updateAttributes(userId, attributeTypes);
 
+      String traineeId = existingUser.getTraineeId();
+      String existingEmail = existingUser.getEmail();
+
       auditService.accountEmailUpdated(userId, traineeId, existingEmail, newEmail);
       eventPublishService.publishEmailUpdateEvent(userId, traineeId, existingEmail, newEmail);
       log.info("Successfully updated email to '{}' for user '{}'.", newEmail, userId);
     }
+  }
+
+  /**
+   * Get the list of name attributes to update for a user, based on the provided existing and new
+   * user details.
+   *
+   * @param existingUser The existing user details.
+   * @param forenames    The new forenames to be used.
+   * @param surname      The new surname to be used.
+   * @return The list of attributes to be updated.
+   */
+  private List<AttributeType> getModifiedAttributes(UserAccountDetailsDto existingUser,
+      String forenames, String surname) {
+    List<AttributeType> attributeTypes = new ArrayList<>();
+
+    if (!Objects.equals(existingUser.getSurname(), surname)) {
+      attributeTypes.add(AttributeType.builder()
+          .name(ATTRIBUTE_FAMILY_NAME).value(surname)
+          .build());
+    }
+
+    if (!Objects.equals(existingUser.getForenames(), forenames)) {
+      attributeTypes.add(AttributeType.builder()
+          .name(ATTRIBUTE_GIVEN_NAME).value(forenames)
+          .build());
+    }
+
+    return attributeTypes;
   }
 
   /**
