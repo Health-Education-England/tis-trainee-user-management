@@ -1295,14 +1295,14 @@ class UserAccountServiceTest {
 
     service.publishAccountRefresh(startDate);
 
-    verify(accountDetailsRepository, never()).findAll();
+    verify(accountDetailsRepository, never()).findAllBy();
     verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
         account1.email(), account1.traineeId());
   }
 
   @Test
   void shouldNotPublishAnyEventsWhenNoAccountsFoundForRefresh() {
-    when(accountDetailsRepository.findAll()).thenReturn(List.of());
+    when(accountDetailsRepository.findAllBy()).thenReturn(Stream.of());
 
     service.publishAccountRefresh(null);
 
