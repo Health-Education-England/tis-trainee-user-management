@@ -29,10 +29,13 @@ import io.awspring.cloud.sns.core.SnsTemplate;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.stereotype.Service;
+import uk.nhs.tis.trainee.usermanagement.event.AccountDeleteEvent;
+import uk.nhs.tis.trainee.usermanagement.event.AccountUpdateEvent;
 import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
 import uk.nhs.tis.trainee.usermanagement.event.ProfileMoveEvent;
@@ -47,21 +50,27 @@ public class EventPublishService {
 
   protected static final String REQUEST_SCHEMA = "tcs";
   protected static final String REQUEST_TABLE = "Person";
+  protected static final String EVENT_TYPE_HEADER = "event_type";
+  protected static final String PRODUCER_HEADER = "producer";
+  protected static final String PRODUCER_VALUE = "tis-trainee-user-management";
 
   private final SnsTemplate notificationMessagingTemplate;
   private final SqsTemplate queueMessagingTemplate;
+  private final String accountEventTopicArn;
   private final String profileMoveTopicArn;
   private final String userAccountUpdateTopicArn;
   private final String queueUrl;
   private final MetricsService metricsService;
 
   EventPublishService(SnsTemplate notificationMessagingTemplate,
+      @Value("${application.aws.sns.account}") String accountEventTopicArn,
       @Value("${application.aws.sns.user-account.update}") String userAccountUpdateTopicArn,
       @Value("${application.aws.sns.profile-move.request}") String profileMoveTopicArn,
       SqsTemplate queueMessagingTemplate,
       @Value("${application.aws.sqs.request}") String requestQueueUrl,
       MetricsService metricsService) {
     this.notificationMessagingTemplate = notificationMessagingTemplate;
+    this.accountEventTopicArn = accountEventTopicArn;
     this.userAccountUpdateTopicArn = userAccountUpdateTopicArn;
     this.profileMoveTopicArn = profileMoveTopicArn;
     this.queueMessagingTemplate = queueMessagingTemplate;
@@ -80,7 +89,7 @@ public class EventPublishService {
     DataRequestEvent dataRequestEvent = new DataRequestEvent(REQUEST_TABLE, traineeTisId);
 
     Map<String, Object> headers = new HashMap<>();
-    String messageGroupId = String.format("%s_%s_%s", REQUEST_SCHEMA, REQUEST_TABLE, traineeTisId);
+    String messageGroupId = REQUEST_SCHEMA + "_" + REQUEST_TABLE + "_" + traineeTisId;
     headers.put("message-group-id", messageGroupId);
 
     GenericMessage<DataRequestEvent> message = new GenericMessage<>(dataRequestEvent, headers);
@@ -105,7 +114,7 @@ public class EventPublishService {
     notificationMessagingTemplate.convertAndSend(userAccountUpdateTopicArn, event, Map.of(
         NOTIFICATION_SUBJECT_HEADER, "Account Email Updated",
         MESSAGE_GROUP_ID_HEADER, userId,
-        "producer", "tis-trainee-user-management"
+        PRODUCER_HEADER, PRODUCER_VALUE
     ));
   }
 
@@ -120,12 +129,47 @@ public class EventPublishService {
 
     ProfileMoveEvent event = new ProfileMoveEvent(fromTisId, toTisId);
 
-    String messageGroupId = String.format("%s_%s", fromTisId, toTisId);
+    String messageGroupId = fromTisId + "_" + toTisId;
 
     notificationMessagingTemplate.convertAndSend(profileMoveTopicArn, event, Map.of(
         NOTIFICATION_SUBJECT_HEADER, "Profile Data Move",
         MESSAGE_GROUP_ID_HEADER, messageGroupId,
-        "producer", "tis-trainee-user-management"
+        PRODUCER_HEADER, PRODUCER_VALUE
+    ));
+  }
+
+  /**
+   * Publish an account update event.
+   *
+   * @param id        The ID of the account updated.
+   * @param sub       The Cognito subject identifier of the account.
+   * @param email     The email associated with the account.
+   * @param traineeId The TIS ID of the trainee.
+   */
+  public void publishAccountUpdateEvent(UUID id, String sub, String email, String traineeId) {
+    log.info("Publishing account update event for account '{}'.", id);
+    AccountUpdateEvent event = new AccountUpdateEvent(id, sub, email, traineeId);
+    notificationMessagingTemplate.convertAndSend(accountEventTopicArn, event, Map.of(
+        NOTIFICATION_SUBJECT_HEADER, "Account Updated",
+        MESSAGE_GROUP_ID_HEADER, id.toString(),
+        EVENT_TYPE_HEADER, "UPDATE",
+        PRODUCER_HEADER, PRODUCER_VALUE
+    ));
+  }
+
+  /**
+   * Publish an account delete event.
+   *
+   * @param id The ID of the account deleted.
+   */
+  public void publishAccountDeleteEvent(UUID id) {
+    log.info("Publishing account delete event for account '{}'.", id);
+    AccountDeleteEvent event = new AccountDeleteEvent(id);
+    notificationMessagingTemplate.convertAndSend(accountEventTopicArn, event, Map.of(
+        NOTIFICATION_SUBJECT_HEADER, "Account Deleted",
+        MESSAGE_GROUP_ID_HEADER, id.toString(),
+        EVENT_TYPE_HEADER, "DELETE",
+        PRODUCER_HEADER, PRODUCER_VALUE
     ));
   }
 }

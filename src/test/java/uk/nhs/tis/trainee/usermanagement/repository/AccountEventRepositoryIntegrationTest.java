@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -153,7 +154,7 @@ class AccountEventRepositoryIntegrationTest {
   @Test
   void shouldReturnLatestEmailUpdateEventForTrainee() {
     AccountEvent olderEvent = AccountEvent.builder()
-        .traineeId("trainee-1")
+        .traineeId("trainee-" + UUID.randomUUID())
         .type(AccountEventType.EMAIL_UPDATED)
         .created(Instant.now().minus(1, ChronoUnit.HOURS))
         .build();

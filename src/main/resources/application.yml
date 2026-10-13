@@ -13,6 +13,7 @@ application:
       user-pool-id: ${COGNITO_USER_POOL_ID}
       beta-participant-group: ${BETA_PARTICIPANT_GROUP}
     sns:
+      account: ${ACCOUNT_EVENT_TOPIC:}
       user-account:
         update: ${USER_ACCOUNT_UPDATE_EVENT_TOPIC:}
       profile-move:

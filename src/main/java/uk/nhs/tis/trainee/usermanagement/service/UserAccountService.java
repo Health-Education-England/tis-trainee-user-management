@@ -28,11 +28,13 @@ import com.mongodb.bulk.BulkWriteResult;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -550,19 +552,64 @@ public class UserAccountService {
     switch (eventName) {
       case "AdminDeleteUser", "DeleteUser" -> {
         log.info("Deleting account details for user '{}'.", sub);
+        accountDetailsRepository.findBySub(sub).ifPresent(account -> {
+          eventPublishService.publishAccountDeleteEvent(account.id());
+        });
         accountDetailsRepository.deleteBySub(sub);
       }
       case "AdminCreateUser", "SignUp", "AdminUpdateUserAttributes", "UpdateUserAttributes" -> {
         UserAccountDetailsDto userDetails = cognitoService.getUserDetails(sub, false, false);
         String email = userDetails.getEmail();
         String traineeId = userDetails.getTraineeId();
-        accountDetailsRepository.upsertBySub(AccountDetailsUpsertRequest.builder()
-            .sub(sub)
-            .email(email)
-            .traineeId(traineeId)
-            .build());
+
+        // handle affected account from email update
+        // unset email of stale account if email is the same (email should be unique)
+        if (email != null && !email.isEmpty()) {
+          for (AccountDetails staledAccount : accountDetailsRepository.findByEmailAndSubNot(
+              email, sub)) {
+            eventPublishService.publishAccountUpdateEvent(staledAccount.id(), staledAccount.sub(),
+                null, staledAccount.traineeId());
+          }
+        }
+
+        AccountDetails account = accountDetailsRepository.upsertBySub(
+            AccountDetailsUpsertRequest.builder()
+                .sub(sub)
+                .email(email)
+                .traineeId(traineeId)
+                .build());
+
+        eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
+            account.email(), account.traineeId());
       }
       default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
     }
+  }
+
+  /**
+   * Publish the current state of all known accounts to the SNS topic, so the downstream services
+   * can refresh their account data.
+   *
+   * @param since The earliest lastModified timestamp include in the refresh job;
+   *                  if null then refresh all account
+   */
+  public void publishAccountRefresh(Instant since) {
+    log.info("Publish account refresh with startDate '{}'.", since);
+
+    long published = 0;
+    try (Stream<AccountDetails> accounts = since == null
+        ? accountDetailsRepository.findAllBy()
+        : accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(since)) {
+
+      Iterator<AccountDetails> it = accounts.iterator();
+      while (it.hasNext()) {
+        AccountDetails account = it.next();
+        eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
+            account.email(), account.traineeId());
+        published++;
+      }
+    }
+
+    log.info("Publish account refresh completed. {} accounts published.", published);
   }
 }

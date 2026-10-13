@@ -40,7 +40,7 @@ public interface AccountDetailsRepositoryCustom {
    *
    * @param upsertRequest The account details to upsert.
    */
-  void upsertBySub(AccountDetailsUpsertRequest upsertRequest);
+  AccountDetails upsertBySub(AccountDetailsUpsertRequest upsertRequest);
 
   /**
    * Bulk upsert (update or insert) account details based on the provided list of

@@ -45,6 +45,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.BulkOperations;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -81,12 +82,17 @@ class AccountDetailsRepositoryImplTest {
 
       ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.captor();
       ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.captor();
+      ArgumentCaptor<FindAndModifyOptions> optionsCaptor = ArgumentCaptor.captor();
 
-      verify(mongoOperations).upsert(queryCaptor.capture(), updateCaptor.capture(),
-          eq(AccountDetails.class));
+      verify(mongoOperations).findAndModify(queryCaptor.capture(), updateCaptor.capture(),
+          optionsCaptor.capture(), eq(AccountDetails.class));
 
       Query query = queryCaptor.getValue();
       assertThat("Unexpected query.", query.getQueryObject().get("sub"), is(SUB));
+
+      FindAndModifyOptions options = optionsCaptor.getValue();
+      assertThat("Expected upsert option.", options.isUpsert(), is(true));
+      assertThat("Expected returnNew option.", options.isReturnNew(), is(true));
 
       Document update = updateCaptor.getValue().getUpdateObject();
       assertThat("Unexpected update keys.", update.keySet(),
@@ -118,8 +124,8 @@ class AccountDetailsRepositoryImplTest {
       repository.upsertBySub(request);
 
       ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.captor();
-      verify(mongoOperations).upsert(any(Query.class), updateCaptor.capture(),
-          eq(AccountDetails.class));
+      verify(mongoOperations).findAndModify(any(Query.class), updateCaptor.capture(),
+          any(FindAndModifyOptions.class), eq(AccountDetails.class));
 
       Document update = updateCaptor.getValue().getUpdateObject();
       Document set = update.get("$set", Document.class);
@@ -156,10 +162,16 @@ class AccountDetailsRepositoryImplTest {
       assertThat("Unexpected sub condition.", subCondition.get("$ne"), is(SUB));
 
       Document update = updateCaptor.getValue().getUpdateObject();
-      assertThat("Unexpected update keys.", update.keySet(), containsInAnyOrder("$unset"));
+      assertThat("Unexpected update keys.", update.keySet(),
+          containsInAnyOrder("$unset", "$set"));
 
       Document unset = update.get("$unset", Document.class);
       assertThat("Unexpected unset keys.", unset.keySet(), containsInAnyOrder("email"));
+
+      Document set = update.get("$set", Document.class);
+      assertThat("Unexpected set keys.", set.keySet(), containsInAnyOrder("lastModified"));
+      assertThat("lastModified should be an instant-like value.", set.get("lastModified"),
+          is(notNullValue()));
     }
 
     @ParameterizedTest

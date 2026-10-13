@@ -39,6 +39,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.Message;
+import uk.nhs.tis.trainee.usermanagement.event.AccountDeleteEvent;
+import uk.nhs.tis.trainee.usermanagement.event.AccountUpdateEvent;
 import uk.nhs.tis.trainee.usermanagement.event.DataRequestEvent;
 import uk.nhs.tis.trainee.usermanagement.event.EmailUpdateEvent;
 import uk.nhs.tis.trainee.usermanagement.event.ProfileMoveEvent;
@@ -46,10 +48,15 @@ import uk.nhs.tis.trainee.usermanagement.event.ProfileMoveEvent;
 class EventPublishServiceTest {
 
   private static final String REQUEST_QUEUE_URL = "request.queue.url";
+  private static final String ACCOUNT_EVENT_TOPIC = "account.event.topic.arn";
   private static final String USER_ACCOUNT_UPDATE_TOPIC = "user-account.update.topic.arn";
   private static final String PROFILE_MOVE_TOPIC = "profile-move.request.topic.arn";
   private static final String TRAINEE_ID = "11111";
   private static final String USER_ID = UUID.randomUUID().toString();
+  private static final UUID ACCOUNT_ID = UUID.randomUUID();
+  private static final String SUB = UUID.randomUUID().toString();
+  private static final String EMAIL = "email@email.com";
+
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
   private SnsTemplate notificationMessagingTemplate;
@@ -61,8 +68,8 @@ class EventPublishServiceTest {
     notificationMessagingTemplate = mock(SnsTemplate.class);
     queueMessagingTemplate = mock(SqsTemplate.class);
     eventPublishService = new EventPublishService(notificationMessagingTemplate,
-        USER_ACCOUNT_UPDATE_TOPIC, PROFILE_MOVE_TOPIC, queueMessagingTemplate, REQUEST_QUEUE_URL,
-        metricsService);
+        ACCOUNT_EVENT_TOPIC, USER_ACCOUNT_UPDATE_TOPIC, PROFILE_MOVE_TOPIC, queueMessagingTemplate,
+        REQUEST_QUEUE_URL, metricsService);
   }
 
   @Test
@@ -81,8 +88,8 @@ class EventPublishServiceTest {
     assertThat("Unexpected headers size.", headers.size(), is(3));
     assertThat("Unexpected headers.", headers.keySet(),
         hasItems("id", "timestamp", "message-group-id"));
-    String expectedMessageGroupId = String.format("%s_%s_%s", EventPublishService.REQUEST_SCHEMA,
-        EventPublishService.REQUEST_TABLE, TRAINEE_ID);
+    String expectedMessageGroupId = EventPublishService.REQUEST_SCHEMA + "_"
+        + EventPublishService.REQUEST_TABLE + "_" + TRAINEE_ID;
     assertThat("Unexpected header.", headers.get("message-group-id"), is(expectedMessageGroupId));
     verify(metricsService).incrementResyncCounter();
   }
@@ -136,8 +143,61 @@ class EventPublishServiceTest {
     assertThat("Unexpected subject.", headers.get(NOTIFICATION_SUBJECT_HEADER),
         is("Profile Data Move"));
     assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
-        is(String.format("%s_%s", fromTisId, toTisId)));
+        is(fromTisId + "_" + toTisId));
     assertThat("Unexpected producer.", headers.get("producer"), is("tis-trainee-user-management"));
+    verifyNoInteractions(metricsService);
+  }
+
+  @Test
+  void shouldPublishAccountUpdateEvent() {
+    eventPublishService.publishAccountUpdateEvent(ACCOUNT_ID, SUB, EMAIL, TRAINEE_ID);
+
+    ArgumentCaptor<AccountUpdateEvent> eventCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.captor();
+    verify(notificationMessagingTemplate).convertAndSend(eq(ACCOUNT_EVENT_TOPIC),
+        eventCaptor.capture(), headersCaptor.capture());
+
+    AccountUpdateEvent event = eventCaptor.getValue();
+    assertThat("Unexpected id.", event.id(), is(ACCOUNT_ID));
+    assertThat("Unexpected sub.", event.sub(), is(SUB));
+    assertThat("Unexpected email.", event.email(), is(EMAIL));
+    assertThat("Unexpected trainee ID.", event.traineeId(), is(TRAINEE_ID));
+
+    Map<String, Object> headers = headersCaptor.getValue();
+    assertThat("Unexpected header count.", headers.size(), is(4));
+    assertThat("Unexpected subject.", headers.get(NOTIFICATION_SUBJECT_HEADER),
+        is("Account Updated"));
+    assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
+        is(ACCOUNT_ID.toString()));
+    assertThat("Unexpected event type.", headers.get(EventPublishService.EVENT_TYPE_HEADER),
+        is("UPDATE"));
+    assertThat("Unexpected producer.", headers.get("producer"),
+        is("tis-trainee-user-management"));
+    verifyNoInteractions(metricsService);
+  }
+
+  @Test
+  void shouldPublishAccountDeleteEvent() {
+    eventPublishService.publishAccountDeleteEvent(ACCOUNT_ID);
+
+    ArgumentCaptor<AccountDeleteEvent> eventCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.captor();
+    verify(notificationMessagingTemplate).convertAndSend(eq(ACCOUNT_EVENT_TOPIC),
+        eventCaptor.capture(), headersCaptor.capture());
+
+    AccountDeleteEvent event = eventCaptor.getValue();
+    assertThat("Unexpected id.", event.id(), is(ACCOUNT_ID));
+
+    Map<String, Object> headers = headersCaptor.getValue();
+    assertThat("Unexpected header count.", headers.size(), is(4));
+    assertThat("Unexpected subject.", headers.get(NOTIFICATION_SUBJECT_HEADER),
+        is("Account Deleted"));
+    assertThat("Unexpected group ID.", headers.get(MESSAGE_GROUP_ID_HEADER),
+        is(ACCOUNT_ID.toString()));
+    assertThat("Unexpected event type.", headers.get(EventPublishService.EVENT_TYPE_HEADER),
+        is("DELETE"));
+    assertThat("Unexpected producer.", headers.get("producer"),
+        is("tis-trainee-user-management"));
     verifyNoInteractions(metricsService);
   }
 }
