@@ -37,6 +37,8 @@ public class UserAccountDetailsDto {
   String id;
   @JsonProperty("username")
   String email;
+  String forenames;
+  String surname;
   String mfaStatus;
   String userStatus;
   @Builder.Default

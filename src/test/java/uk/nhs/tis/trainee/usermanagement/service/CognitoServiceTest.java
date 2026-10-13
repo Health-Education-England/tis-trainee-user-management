@@ -84,12 +84,16 @@ class CognitoServiceTest {
   private static final String USER_ID = UUID.randomUUID().toString();
   private static final String TRAINEE_ID = UUID.randomUUID().toString();
   private static final String EMAIL = "joe.bloggs@fake.email";
+  private static final String FORENAMES = "Joe";
+  private static final String SURNAME = "Bloggs";
   private static final String GROUP_1 = "user-group-one";
   private static final String GROUP_2 = "user-group-two";
   private static final Instant CREATED = Instant.now();
 
   private static final String ATTRIBUTE_SUB = "sub";
   private static final String ATTRIBUTE_EMAIL = "email";
+  private static final String ATTRIBUTE_FAMILY_NAME = "family_name";
+  private static final String ATTRIBUTE_GIVEN_NAME = "given_name";
   private static final String ATTRIBUTE_MFA_TYPE = "custom:mfaType";
   private static final String ATTRIBUTE_TRAINEE_ID = "custom:tisId";
 
@@ -160,6 +164,8 @@ class CognitoServiceTest {
               .attributes(
                   AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
                   AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_GIVEN_NAME).value(FORENAMES).build(),
+                  AttributeType.builder().name(ATTRIBUTE_FAMILY_NAME).value(SURNAME).build(),
                   AttributeType.builder().name(ATTRIBUTE_MFA_TYPE).value(mfaType.toString())
                       .build(),
                   AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
@@ -174,6 +180,8 @@ class CognitoServiceTest {
 
       assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
       assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
+      assertThat("Unexpected forenames.", userDetails.getForenames(), is(FORENAMES));
+      assertThat("Unexpected surname.", userDetails.getSurname(), is(SURNAME));
       assertThat("Unexpected MFA status.", userDetails.getMfaStatus(), is(mfaType.toString()));
       assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
       assertThat("Unexpected user status.", userDetails.getGroups(), hasSize(0));
@@ -236,6 +244,8 @@ class CognitoServiceTest {
               .userAttributes(
                   AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
                   AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_GIVEN_NAME).value(FORENAMES).build(),
+                  AttributeType.builder().name(ATTRIBUTE_FAMILY_NAME).value(SURNAME).build(),
                   AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
               )
               .preferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
@@ -248,6 +258,8 @@ class CognitoServiceTest {
 
       assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
       assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
+      assertThat("Unexpected forenames.", userDetails.getForenames(), is(FORENAMES));
+      assertThat("Unexpected surname.", userDetails.getSurname(), is(SURNAME));
       assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
           is(SOFTWARE_TOKEN_MFA.toString()));
       assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
@@ -305,6 +317,8 @@ class CognitoServiceTest {
               .userAttributes(
                   AttributeType.builder().name(ATTRIBUTE_SUB).value(USER_ID).build(),
                   AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
+                  AttributeType.builder().name(ATTRIBUTE_GIVEN_NAME).value(FORENAMES).build(),
+                  AttributeType.builder().name(ATTRIBUTE_FAMILY_NAME).value(SURNAME).build(),
                   AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID).build()
               )
               .preferredMfaSetting(SOFTWARE_TOKEN_MFA.toString())
@@ -317,6 +331,8 @@ class CognitoServiceTest {
 
       assertThat("Unexpected ID.", userDetails.getId(), is(USER_ID));
       assertThat("Unexpected email.", userDetails.getEmail(), is(EMAIL));
+      assertThat("Unexpected forenames.", userDetails.getForenames(), is(FORENAMES));
+      assertThat("Unexpected surname.", userDetails.getSurname(), is(SURNAME));
       assertThat("Unexpected MFA status.", userDetails.getMfaStatus(),
           is(SOFTWARE_TOKEN_MFA.toString()));
       assertThat("Unexpected user status.", userDetails.getUserStatus(), is(CONFIRMED.toString()));
