@@ -869,13 +869,17 @@ class UserAccountServiceTest {
         .attributes(
             AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_1).build(),
             AttributeType.builder().name(ATTRIBUTE_EMAIL).value(EMAIL).build(),
-            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build())
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_1).build(),
+            AttributeType.builder().name(ATTRIBUTE_GIVEN_NAME).value(FORENAMES_1).build(),
+            AttributeType.builder().name(ATTRIBUTE_FAMILY_NAME).value(SURNAME_1).build())
         .build();
     UserType user2 = UserType.builder()
         .attributes(
             AttributeType.builder().name(ATTRIBUTE_USER_ID).value(USER_ID_2).build(),
             AttributeType.builder().name(ATTRIBUTE_EMAIL).value("second@example.com").build(),
-            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build())
+            AttributeType.builder().name(ATTRIBUTE_TRAINEE_ID).value(TRAINEE_ID_2).build(),
+            AttributeType.builder().name(ATTRIBUTE_GIVEN_NAME).value(FORENAMES_2).build(),
+            AttributeType.builder().name(ATTRIBUTE_FAMILY_NAME).value(SURNAME_2).build())
         .build();
 
     when(cognitoService.listUsers(any())).thenReturn(ListUsersResponse.builder()
@@ -907,11 +911,15 @@ class UserAccountServiceTest {
     assertThat("Unexpected request sub.", request1.sub(), is(USER_ID_1));
     assertThat("Unexpected request email.", request1.email(), is(EMAIL));
     assertThat("Unexpected request trainee ID.", request1.traineeId(), is(TRAINEE_ID_1));
+    assertThat("Unexpected request forename.", request1.forename(), is(FORENAMES_1));
+    assertThat("Unexpected request surname.", request1.surname(), is(SURNAME_1));
 
     AccountDetailsUpsertRequest request2 = upsertRequests.get(1);
     assertThat("Unexpected request sub.", request2.sub(), is(USER_ID_2));
     assertThat("Unexpected request email.", request2.email(), is("second@example.com"));
     assertThat("Unexpected request trainee ID.", request2.traineeId(), is(TRAINEE_ID_2));
+    assertThat("Unexpected request forename.", request2.forename(), is(FORENAMES_2));
+    assertThat("Unexpected request surname.", request2.surname(), is(SURNAME_2));
 
     ArgumentCaptor<Instant> deleteCaptor = ArgumentCaptor.captor();
     verify(accountDetailsRepository).deleteByLastModifiedBefore(deleteCaptor.capture());
@@ -1093,7 +1101,8 @@ class UserAccountServiceTest {
     verify(accountDetailsRepository, never()).deleteBySub(any());
     verify(accountDetailsRepository, never()).findByEmailAndSubNot(any(), any());
     verify(accountDetailsRepository, never()).upsertBySub(any());
-    verify(eventPublishService, never()).publishAccountUpdateEvent(any(), any(), any(), any());
+    verify(eventPublishService, never())
+        .publishAccountUpdateEvent(any(), any(), any(), any(), any(), any());
   }
 
   @ParameterizedTest
@@ -1108,6 +1117,8 @@ class UserAccountServiceTest {
         .id(USER_ID_1)
         .email(newEmail)
         .traineeId(TRAINEE_ID_2)
+        .forenames(FORENAMES_2)
+        .surname(SURNAME_2)
         .build();
     when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
 
@@ -1130,6 +1141,8 @@ class UserAccountServiceTest {
     assertThat("Unexpected sub.", upsertRequest.sub(), is(USER_ID_1));
     assertThat("Unexpected email.", upsertRequest.email(), is("new@example.com"));
     assertThat("Unexpected trainee ID.", upsertRequest.traineeId(), is(TRAINEE_ID_2));
+    assertThat("Unexpected forename.", upsertRequest.forename(), is(FORENAMES_2));
+    assertThat("Unexpected surname.", upsertRequest.surname(), is(SURNAME_2));
   }
 
   @ParameterizedTest
@@ -1144,6 +1157,8 @@ class UserAccountServiceTest {
         .id(USER_ID_1)
         .email(newEmail)
         .traineeId(TRAINEE_ID_2)
+        .forenames(FORENAMES_2)
+        .surname(SURNAME_2)
         .build();
     when(cognitoService.getUserDetails(USER_ID_1, false, false)).thenReturn(userDetails);
 
@@ -1153,6 +1168,8 @@ class UserAccountServiceTest {
         .sub(USER_ID_1)
         .email(newEmail)
         .traineeId(TRAINEE_ID_2)
+        .forename(FORENAMES_2)
+        .surname(SURNAME_2)
         .build();
     when(accountDetailsRepository.upsertBySub(any())).thenReturn(upsertedAccount);
 
@@ -1161,7 +1178,8 @@ class UserAccountServiceTest {
     InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
     inOrder.verify(accountDetailsRepository).upsertBySub(any());
     inOrder.verify(eventPublishService)
-        .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2);
+        .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2, FORENAMES_2,
+            SURNAME_2);
   }
 
   @ParameterizedTest
@@ -1183,6 +1201,8 @@ class UserAccountServiceTest {
         .sub("old-sub")
         .email(newEmail)
         .traineeId(TRAINEE_ID_1)
+        .forename(FORENAMES_1)
+        .surname(SURNAME_1)
         .build();
     when(accountDetailsRepository.findByEmailAndSubNot(newEmail, USER_ID_1))
         .thenReturn(List.of(staledAccount));
@@ -1202,10 +1222,10 @@ class UserAccountServiceTest {
     InOrder inOrder = inOrder(accountDetailsRepository, eventPublishService);
     inOrder.verify(eventPublishService)
         .publishAccountUpdateEvent(staledAccount.id(), staledAccount.sub(), null,
-            staledAccount.traineeId());
+            staledAccount.traineeId(), FORENAMES_1, SURNAME_1);
     inOrder.verify(accountDetailsRepository).upsertBySub(any());
     inOrder.verify(eventPublishService)
-        .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2);
+        .publishAccountUpdateEvent(accountId, USER_ID_1, newEmail, TRAINEE_ID_2, null, null);
   }
 
   @ParameterizedTest
@@ -1235,9 +1255,9 @@ class UserAccountServiceTest {
     verify(accountDetailsRepository, never()).findByEmailAndSubNot(any(), any());
     verify(accountDetailsRepository).upsertBySub(any(AccountDetailsUpsertRequest.class));
     verify(eventPublishService, times(1))
-        .publishAccountUpdateEvent(any(), any(), any(), any());
+        .publishAccountUpdateEvent(any(), any(), any(), any(), any(), any());
     verify(eventPublishService)
-        .publishAccountUpdateEvent(accountId, USER_ID_1, email, TRAINEE_ID_2);
+        .publishAccountUpdateEvent(accountId, USER_ID_1, email, TRAINEE_ID_2, null, null);
   }
 
   @Test
@@ -1263,12 +1283,16 @@ class UserAccountServiceTest {
         .sub(USER_ID_1)
         .email(EMAIL)
         .traineeId(TRAINEE_ID_1)
+        .forename(FORENAMES_1)
+        .surname(SURNAME_1)
         .build();
     AccountDetails account2 = AccountDetails.builder()
         .id(UUID.randomUUID())
         .sub(USER_ID_2)
         .email("other@example.com")
         .traineeId(TRAINEE_ID_2)
+        .forename(FORENAMES_2)
+        .surname(SURNAME_2)
         .build();
     when(accountDetailsRepository.findAllBy()).thenReturn(Stream.of(account1, account2));
 
@@ -1276,9 +1300,9 @@ class UserAccountServiceTest {
 
     verify(accountDetailsRepository, never()).findAllByLastModifiedGreaterThanEqual(any());
     verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
-        account1.email(), account1.traineeId());
+        account1.email(), account1.traineeId(), FORENAMES_1, SURNAME_1);
     verify(eventPublishService).publishAccountUpdateEvent(account2.id(), account2.sub(),
-        account2.email(), account2.traineeId());
+        account2.email(), account2.traineeId(), FORENAMES_2, SURNAME_2);
   }
 
   @Test
@@ -1289,6 +1313,8 @@ class UserAccountServiceTest {
         .sub(USER_ID_1)
         .email(EMAIL)
         .traineeId(TRAINEE_ID_1)
+        .forename(FORENAMES_1)
+        .surname(SURNAME_1)
         .build();
     when(accountDetailsRepository.findAllByLastModifiedGreaterThanEqual(startDate)).thenReturn(
         Stream.of(account1));
@@ -1297,7 +1323,7 @@ class UserAccountServiceTest {
 
     verify(accountDetailsRepository, never()).findAllBy();
     verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
-        account1.email(), account1.traineeId());
+        account1.email(), account1.traineeId(), FORENAMES_1, SURNAME_1);
   }
 
   @Test
@@ -1306,6 +1332,7 @@ class UserAccountServiceTest {
 
     service.publishAccountRefresh(null);
 
-    verify(eventPublishService, never()).publishAccountUpdateEvent(any(), any(), any(), any());
+    verify(eventPublishService, never())
+        .publishAccountUpdateEvent(any(), any(), any(), any(), any(), any());
   }
 }

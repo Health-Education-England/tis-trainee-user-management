@@ -30,7 +30,10 @@ import java.util.UUID;
  * @param sub       The sub of the account.
  * @param email     The registered email of the account.
  * @param traineeId The id of the trainee.
+ * @param forename  The forename of the account holder.
+ * @param surname   The surname of the account holder.
  */
-public record AccountUpdateEvent(UUID id, String sub, String email, String traineeId) {
+public record AccountUpdateEvent(UUID id, String sub, String email, String traineeId,
+                                 String forename, String surname) {
 
 }

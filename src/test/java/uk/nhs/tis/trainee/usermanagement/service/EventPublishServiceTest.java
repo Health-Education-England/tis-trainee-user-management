@@ -56,6 +56,8 @@ class EventPublishServiceTest {
   private static final UUID ACCOUNT_ID = UUID.randomUUID();
   private static final String SUB = UUID.randomUUID().toString();
   private static final String EMAIL = "email@email.com";
+  private static final String FORENAME = "Anthony";
+  private static final String SURNAME = "Gilliam";
 
   private EventPublishService eventPublishService;
   private MetricsService metricsService;
@@ -150,7 +152,8 @@ class EventPublishServiceTest {
 
   @Test
   void shouldPublishAccountUpdateEvent() {
-    eventPublishService.publishAccountUpdateEvent(ACCOUNT_ID, SUB, EMAIL, TRAINEE_ID);
+    eventPublishService.publishAccountUpdateEvent(ACCOUNT_ID, SUB, EMAIL, TRAINEE_ID, FORENAME,
+        SURNAME);
 
     ArgumentCaptor<AccountUpdateEvent> eventCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Map<String, Object>> headersCaptor = ArgumentCaptor.captor();
@@ -162,6 +165,8 @@ class EventPublishServiceTest {
     assertThat("Unexpected sub.", event.sub(), is(SUB));
     assertThat("Unexpected email.", event.email(), is(EMAIL));
     assertThat("Unexpected trainee ID.", event.traineeId(), is(TRAINEE_ID));
+    assertThat("Unexpected forename.", event.forename(), is(FORENAME));
+    assertThat("Unexpected surname.", event.surname(), is(SURNAME));
 
     Map<String, Object> headers = headersCaptor.getValue();
     assertThat("Unexpected header count.", headers.size(), is(4));

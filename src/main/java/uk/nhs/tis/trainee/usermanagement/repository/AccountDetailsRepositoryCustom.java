@@ -59,9 +59,12 @@ public interface AccountDetailsRepositoryCustom {
    * @param sub       The user's subject identifier.
    * @param email     The user's email address.
    * @param traineeId The user's trainee ID.
+   * @param forename  The user's forename.
+   * @param surname   The user's surname.
    */
   @Builder
-  record AccountDetailsUpsertRequest(String sub, String email, String traineeId) {
+  record AccountDetailsUpsertRequest(String sub, String email, String traineeId, String forename,
+                                     String surname) {
 
   }
 }
