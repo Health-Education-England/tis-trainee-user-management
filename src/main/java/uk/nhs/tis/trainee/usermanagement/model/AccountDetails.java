@@ -37,6 +37,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
  * @param sub          The subject identifier of the user associated with the account.
  * @param email        The email address of the user associated with the account.
  * @param traineeId    The ID of the trainee associated with the user account.
+ * @param forename     The forename of the user associated with the account.
+ * @param surname      The surname of the user associated with the account.
  * @param lastModified The timestamp of the last modification to the account.
  */
 @Document("AccountDetails")
@@ -56,6 +58,12 @@ public record AccountDetails(
     @Indexed
     @With
     String traineeId,
+
+    @With
+    String forename,
+
+    @With
+    String surname,
 
     @Indexed
     @LastModifiedDate

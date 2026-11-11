@@ -145,10 +145,14 @@ public class EventPublishService {
    * @param sub       The Cognito subject identifier of the account.
    * @param email     The email associated with the account.
    * @param traineeId The TIS ID of the trainee.
+   * @param forename  The forename of the account holder.
+   * @param surname   The surname of the account holder.
    */
-  public void publishAccountUpdateEvent(UUID id, String sub, String email, String traineeId) {
+  public void publishAccountUpdateEvent(UUID id, String sub, String email, String traineeId,
+      String forename, String surname) {
     log.info("Publishing account update event for account '{}'.", id);
-    AccountUpdateEvent event = new AccountUpdateEvent(id, sub, email, traineeId);
+    AccountUpdateEvent event = new AccountUpdateEvent(id, sub, email, traineeId, forename,
+        surname);
     notificationMessagingTemplate.convertAndSend(accountEventTopicArn, event, Map.of(
         NOTIFICATION_SUBJECT_HEADER, "Account Updated",
         MESSAGE_GROUP_ID_HEADER, id.toString(),

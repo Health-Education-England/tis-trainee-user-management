@@ -57,6 +57,8 @@ class AccountDetailsRepositoryImplTest {
   private static final String SUB = UUID.randomUUID().toString();
   private static final String EMAIL = "test@example.com";
   private static final String TRAINEE_ID = UUID.randomUUID().toString();
+  private static final String FORENAME = "Anthony";
+  private static final String SURNAME = "Gilliam";
 
   private AccountDetailsRepositoryImpl repository;
   private MongoOperations mongoOperations;
@@ -76,6 +78,8 @@ class AccountDetailsRepositoryImplTest {
           .sub(SUB)
           .email(EMAIL)
           .traineeId(TRAINEE_ID)
+          .forename(FORENAME)
+          .surname(SURNAME)
           .build();
 
       repository.upsertBySub(request);
@@ -100,10 +104,13 @@ class AccountDetailsRepositoryImplTest {
 
       Document set = update.get("$set", Document.class);
       assertThat("Unexpected set keys.", set.keySet(),
-          containsInAnyOrder("sub", "email", "traineeId", "lastModified", "_class"));
+          containsInAnyOrder("sub", "email", "traineeId", "forename", "surname",
+              "lastModified", "_class"));
       assertThat("Unexpected update sub.", set.get("sub"), is(SUB));
       assertThat("Unexpected update email.", set.get("email"), is(EMAIL));
       assertThat("Unexpected update traineeId.", set.get("traineeId"), is(TRAINEE_ID));
+      assertThat("Unexpected update forename.", set.get("forename"), is(FORENAME));
+      assertThat("Unexpected update surname.", set.get("surname"), is(SURNAME));
       assertThat("Unexpected update lastModified.", set.get("lastModified"), notNullValue());
       assertThat("Unexpected update class.", set.get("_class"), is(AccountDetails.class.getName()));
 
@@ -114,11 +121,13 @@ class AccountDetailsRepositoryImplTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    void shouldUnsetEmailAndTraineeIdWhenNullOrEmpty(String value) {
+    void shouldUnsetOptionalFieldsWhenNullOrEmpty(String value) {
       AccountDetailsUpsertRequest request = AccountDetailsUpsertRequest.builder()
           .sub(SUB)
           .email(value)
           .traineeId(value)
+          .forename(value)
+          .surname(value)
           .build();
 
       repository.upsertBySub(request);
@@ -134,7 +143,7 @@ class AccountDetailsRepositoryImplTest {
 
       Document unset = update.get("$unset", Document.class);
       assertThat("Unexpected unset keys.", unset.keySet(),
-          containsInAnyOrder("email", "traineeId"));
+          containsInAnyOrder("email", "traineeId", "forename", "surname"));
     }
 
     @Test
@@ -207,12 +216,16 @@ class AccountDetailsRepositoryImplTest {
           .sub(SUB)
           .email(EMAIL)
           .traineeId(TRAINEE_ID)
+          .forename(FORENAME)
+          .surname(SURNAME)
           .build();
 
       AccountDetailsUpsertRequest request2 = AccountDetailsUpsertRequest.builder()
           .sub(UUID.randomUUID().toString())
           .email("test2@example.com")
           .traineeId(UUID.randomUUID().toString())
+          .forename("Forename2")
+          .surname("Surname2")
           .build();
 
       final BulkWriteResult result = repository.bulkUpsertBySub(List.of(request1, request2));
@@ -236,10 +249,13 @@ class AccountDetailsRepositoryImplTest {
 
       Document firstSet = firstUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", firstSet.keySet(),
-          containsInAnyOrder("sub", "email", "traineeId", "lastModified", "_class"));
+          containsInAnyOrder("sub", "email", "traineeId", "forename", "surname", "lastModified",
+              "_class"));
       assertThat("Unexpected update sub.", firstSet.get("sub"), is(SUB));
       assertThat("Unexpected update email.", firstSet.get("email"), is(EMAIL));
       assertThat("Unexpected update traineeId.", firstSet.get("traineeId"), is(TRAINEE_ID));
+      assertThat("Unexpected update forename.", firstSet.get("forename"), is(FORENAME));
+      assertThat("Unexpected update surname.", firstSet.get("surname"), is(SURNAME));
       assertThat("Unexpected update lastModified.", firstSet.get("lastModified"), notNullValue());
       assertThat("Unexpected update class.", firstSet.get("_class"),
           is(AccountDetails.class.getName()));
@@ -255,11 +271,15 @@ class AccountDetailsRepositoryImplTest {
 
       Document secondSet = secondUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", secondSet.keySet(),
-          containsInAnyOrder("sub", "email", "traineeId", "lastModified", "_class"));
+          containsInAnyOrder("sub", "email", "traineeId", "forename", "surname", "lastModified",
+              "_class"));
       assertThat("Unexpected update sub.", secondSet.get("sub"), is(request2.sub()));
       assertThat("Unexpected update email.", secondSet.get("email"), is(request2.email()));
       assertThat("Unexpected update traineeId.", secondSet.get("traineeId"),
           is(request2.traineeId()));
+      assertThat("Unexpected update forename.", secondSet.get("forename"),
+          is(request2.forename()));
+      assertThat("Unexpected update surname.", secondSet.get("surname"), is(request2.surname()));
       assertThat("Unexpected update lastModified.", secondSet.get("lastModified"), notNullValue());
       assertThat("Unexpected update class.", secondSet.get("_class"),
           is(AccountDetails.class.getName()));
@@ -273,7 +293,7 @@ class AccountDetailsRepositoryImplTest {
     }
 
     @Test
-    void shouldUnsetEmailAndTraineeIdWhenNullOrEmpty() {
+    void shouldUnsetOptionalFieldsWhenNullOrEmpty() {
       BulkOperations bulkOperations = mock(BulkOperations.class);
       BulkWriteResult bulkWriteResult = mock(BulkWriteResult.class);
 
@@ -286,12 +306,16 @@ class AccountDetailsRepositoryImplTest {
           .sub(SUB)
           .email(null)
           .traineeId(TRAINEE_ID)
+          .forename(null)
+          .surname(SURNAME)
           .build();
 
       AccountDetailsUpsertRequest request2 = AccountDetailsUpsertRequest.builder()
           .sub(UUID.randomUUID().toString())
           .email("")
           .traineeId("")
+          .forename("")
+          .surname("")
           .build();
 
       repository.bulkUpsertBySub(List.of(request1, request2));
@@ -304,9 +328,10 @@ class AccountDetailsRepositoryImplTest {
       Document firstUpdate = updates.get(0).getUpdateObject();
       Document firstSet = firstUpdate.get("$set", Document.class);
       assertThat("Unexpected set keys.", firstSet.keySet(),
-          containsInAnyOrder("sub", "traineeId", "lastModified", "_class"));
+          containsInAnyOrder("sub", "traineeId", "surname", "lastModified", "_class"));
       Document firstUnset = firstUpdate.get("$unset", Document.class);
-      assertThat("Unexpected unset keys.", firstUnset.keySet(), containsInAnyOrder("email"));
+      assertThat("Unexpected unset keys.", firstUnset.keySet(),
+          containsInAnyOrder("email", "forename"));
 
       Document secondUpdate = updates.get(1).getUpdateObject();
       Document secondSet = secondUpdate.get("$set", Document.class);
@@ -314,7 +339,7 @@ class AccountDetailsRepositoryImplTest {
           containsInAnyOrder("sub", "lastModified", "_class"));
       Document secondUnset = secondUpdate.get("$unset", Document.class);
       assertThat("Unexpected unset keys.", secondUnset.keySet(),
-          containsInAnyOrder("email", "traineeId"));
+          containsInAnyOrder("email", "traineeId", "forename", "surname"));
     }
 
     @Test

@@ -521,6 +521,8 @@ public class UserAccountService {
               .sub(attributes.get(ATTRIBUTE_SUB))
               .email(attributes.get(ATTRIBUTE_EMAIL))
               .traineeId(attributes.get(ATTRIBUTE_TIS_ID))
+              .forename(attributes.get(ATTRIBUTE_GIVEN_NAME))
+              .surname(attributes.get(ATTRIBUTE_FAMILY_NAME))
               .build())
           .toList();
       BulkWriteResult upsertResult = accountDetailsRepository.bulkUpsertBySub(upsertRequests);
@@ -568,7 +570,8 @@ public class UserAccountService {
           for (AccountDetails staledAccount : accountDetailsRepository.findByEmailAndSubNot(
               email, sub)) {
             eventPublishService.publishAccountUpdateEvent(staledAccount.id(), staledAccount.sub(),
-                null, staledAccount.traineeId());
+                null, staledAccount.traineeId(), staledAccount.forename(),
+                staledAccount.surname());
           }
         }
 
@@ -577,10 +580,12 @@ public class UserAccountService {
                 .sub(sub)
                 .email(email)
                 .traineeId(traineeId)
+                .forename(userDetails.getForenames())
+                .surname(userDetails.getSurname())
                 .build());
 
         eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
-            account.email(), account.traineeId());
+            account.email(), account.traineeId(), account.forename(), account.surname());
       }
       default -> log.warn("Received unexpected Cognito event '{}', ignoring.", eventName);
     }
@@ -605,7 +610,7 @@ public class UserAccountService {
       while (it.hasNext()) {
         AccountDetails account = it.next();
         eventPublishService.publishAccountUpdateEvent(account.id(), account.sub(),
-            account.email(), account.traineeId());
+            account.email(), account.traineeId(), account.forename(), account.surname());
         published++;
       }
     }

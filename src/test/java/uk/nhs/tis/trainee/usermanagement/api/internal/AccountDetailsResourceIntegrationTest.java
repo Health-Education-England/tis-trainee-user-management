@@ -182,9 +182,9 @@ class AccountDetailsResourceIntegrationTest {
         .andExpect(status().isNoContent());
 
     verify(eventPublishService).publishAccountUpdateEvent(account1.id(), account1.sub(),
-        account1.email(), account1.traineeId());
+        account1.email(), account1.traineeId(), account1.forename(), account1.surname());
     verify(eventPublishService).publishAccountUpdateEvent(account2.id(), account2.sub(),
-        account2.email(), account2.traineeId());
+        account2.email(), account2.traineeId(), account2.forename(), account2.surname());
   }
 
   @Test
@@ -209,8 +209,9 @@ class AccountDetailsResourceIntegrationTest {
         .andExpect(status().isNoContent());
 
     verify(eventPublishService, never())
-        .publishAccountUpdateEvent(eq(staleAccount.id()), any(), any(), any());
+        .publishAccountUpdateEvent(eq(staleAccount.id()), any(), any(), any(), any(), any());
     verify(eventPublishService).publishAccountUpdateEvent(recentAccount.id(),
-        recentAccount.sub(), recentAccount.email(), recentAccount.traineeId());
+        recentAccount.sub(), recentAccount.email(), recentAccount.traineeId(),
+        recentAccount.forename(), recentAccount.surname());
   }
 }

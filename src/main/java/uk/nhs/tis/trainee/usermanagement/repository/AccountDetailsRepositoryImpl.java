@@ -44,6 +44,8 @@ public class AccountDetailsRepositoryImpl implements AccountDetailsRepositoryCus
   private static final String SUB_FIELD = "sub";
   private static final String EMAIL_FIELD = "email";
   private static final String TRAINEE_ID_FIELD = "traineeId";
+  private static final String FORENAME_FIELD = "forename";
+  private static final String SURNAME_FIELD = "surname";
   private static final String LAST_MODIFIED_FIELD = "lastModified";
   private static final String CLASS_FIELD = "_class";
 
@@ -122,6 +124,8 @@ public class AccountDetailsRepositoryImpl implements AccountDetailsRepositoryCus
         .set(CLASS_FIELD, AccountDetails.class.getName());
     setOrUnset(update, EMAIL_FIELD, request.email());
     setOrUnset(update, TRAINEE_ID_FIELD, request.traineeId());
+    setOrUnset(update, FORENAME_FIELD, request.forename());
+    setOrUnset(update, SURNAME_FIELD, request.surname());
     return update;
   }
 
