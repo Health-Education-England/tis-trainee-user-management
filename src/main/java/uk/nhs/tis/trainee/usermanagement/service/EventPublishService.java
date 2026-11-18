@@ -24,7 +24,6 @@ package uk.nhs.tis.trainee.usermanagement.service;
 import static io.awspring.cloud.sns.core.SnsHeaders.MESSAGE_GROUP_ID_HEADER;
 import static io.awspring.cloud.sns.core.SnsHeaders.NOTIFICATION_SUBJECT_HEADER;
 
-import com.amazonaws.xray.spring.aop.XRayEnabled;
 import io.awspring.cloud.sns.core.SnsTemplate;
 import io.awspring.cloud.sqs.operations.SqsTemplate;
 import java.util.HashMap;
@@ -45,7 +44,6 @@ import uk.nhs.tis.trainee.usermanagement.event.ProfileMoveEvent;
  */
 @Slf4j
 @Service
-@XRayEnabled
 public class EventPublishService {
 
   protected static final String REQUEST_SCHEMA = "tcs";
