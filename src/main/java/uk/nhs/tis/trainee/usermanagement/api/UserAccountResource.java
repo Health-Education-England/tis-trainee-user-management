@@ -21,7 +21,6 @@
 
 package uk.nhs.tis.trainee.usermanagement.api;
 
-import com.amazonaws.xray.spring.aop.XRayEnabled;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,7 +43,6 @@ import uk.nhs.tis.trainee.usermanagement.service.UserAccountService;
 @Slf4j
 @RestController
 @RequestMapping("/api/user-account")
-@XRayEnabled
 public class UserAccountResource {
 
   private final UserAccountService service;

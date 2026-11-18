@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "uk.nhs.tis.trainee"
-version = "2.12.0"
+version = "2.13.0"
 
 configurations {
   compileOnly {
@@ -53,7 +53,6 @@ dependencies {
   implementation("io.awspring.cloud:spring-cloud-aws-starter-sns")
   implementation("io.awspring.cloud:spring-cloud-aws-starter-sqs")
   implementation("software.amazon.awssdk:cognitoidentityprovider")
-  implementation(libs.aws.xray.spring)
 
   //Amazon Cloudwatch
   implementation("io.micrometer:micrometer-core")
