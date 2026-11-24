@@ -23,7 +23,6 @@ gradlew bootRun
 |---------------------------------|-----------------------------------------------------------|-----------|
 | ACCOUNT_EVENT_TOPIC             | The topic ARN to publish account event to.                |           |
 | AWS_REGION                      | The AWS region to use.                                    |           |
-| AWS_XRAY_DAEMON_ADDRESS         | The AWS XRay daemon host.                                 |           |
 | BETA_PARTICIPANT_GROUP          | The name of the Cognito user group for beta participants. |           |
 | COGNITO_USER_POOL_ID            | The ID of the Cognito user pool to manage.                |           |
 | ENVIRONMENT                     | The environment to log events against.                    | local     |

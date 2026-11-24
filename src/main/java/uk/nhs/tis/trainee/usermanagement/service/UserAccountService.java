@@ -23,7 +23,6 @@ package uk.nhs.tis.trainee.usermanagement.service;
 
 import static uk.nhs.tis.trainee.usermanagement.enumeration.MfaType.NO_MFA;
 
-import com.amazonaws.xray.spring.aop.XRayEnabled;
 import com.mongodb.bulk.BulkWriteResult;
 import java.time.Duration;
 import java.time.Instant;
@@ -71,7 +70,6 @@ import uk.nhs.tis.trainee.usermanagement.repository.AccountEventRepository;
  */
 @Slf4j
 @Service
-@XRayEnabled
 public class UserAccountService {
 
   private static final String NO_ACCOUNT = "NO_ACCOUNT";
